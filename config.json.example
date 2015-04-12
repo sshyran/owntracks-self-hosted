@@ -1,0 +1,6 @@
+{
+	"SESSION_SECRET":"CHANGEME", 
+	"db_name": "traction", 
+	"db_user": "CHANGEME", 
+	"db_password": "CHANGEME"
+}

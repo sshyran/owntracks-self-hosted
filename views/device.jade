@@ -1,0 +1,43 @@
+extends layout
+block pageTitle
+  h1.pageTitle 
+
+
+block body
+  .col-sm-6.col-lg-offset-3
+    .panel.panel-default
+      .panel-heading
+        h4.head Device details
+      .panel-body
+        dl.dl-horizontal.device-details
+          dt Devicename
+          dd= device.devicename
+          dt Topic
+          dd= user.getDeviceTopic(device)
+          dt Login
+          dd= user.getDeviceLogin(device)
+          dt Access Token
+          - if(accessToken)
+            dd
+              span.accessTokenPlain= accessToken 
+          -else
+            dd 
+              span.accessTokenLocked.glyphicon.glyphicon-lock
+        hr.full
+        p
+          - if(accessToken) 
+            | This is the last time the device credentials will be available for download. Please note down the login and access token somewhere secure. You can generate new credentials at any time. 
+          - else
+            | Your device credentials cannot be recovered once they have been generated. If you have lost your credentials please reset the credentials for this device. Other devices will not be effected. 
+
+
+
+        
+
+      .panel-footer
+        form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/delete')
+          button.pull-right.btn.btn-danger(type='submit', value="delete") Delete
+        form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/reset')
+          button.pull-right.btn.btn-white(type='submit', value="delete") Reset credentials
+        .clearfix
+

@@ -1,0 +1,27 @@
+extends layout
+
+block body
+  .row
+    .col-lg-4.col-lg-offset-4
+      .panel.panel-default#login
+        .panel-heading
+          h4 Login
+        form.bs-example.form-horizontal(method='post', action='')
+          .panel-body
+            fieldset
+              if error
+                .alert.alert-dismissable.alert-danger.login-fail
+                  button.close(type='button', data-dismiss='alert') &times;
+                  p.
+                    #{error}
+              .form-group
+                .col-lg-12
+                  input#username.form-control(type='email', name='username', placeholder='Email', autofocus)
+              .form-group
+                .col-lg-12
+                  input#password.form-control(type='password', name='password', placeholder='Password')
+          .panel-footer
+            button.pull-right.btn.btn-green(type='submit') Login
+            a(href="/register" class="btn btn-white pull-right") Register
+            .clearfix
+

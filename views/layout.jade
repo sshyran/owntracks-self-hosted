@@ -1,0 +1,39 @@
+doctype html
+html
+  head
+    meta(charset='utf-8')
+    meta(content='width=device-width, initial-scale=1', name='viewport')
+    title= 'OwnTracks | Traction'
+    link(href='/css/bootstrap.css', rel='stylesheet')
+    link(href='/css/app.css', rel='stylesheet')
+  body
+    .page-container
+      // top navbar
+      .navbar(role='navigation')
+        .navbar-header.pull-left
+          a(class="navbar-brand" href="/") OwnTracks Traction
+
+        ul(class="nav navbar-nav navbar-right")
+          - if(user)
+            li.dropdown
+              a(href="#", class="dropdown-toggle" id="user" data-toggle="dropdown")
+                img(src="data:image/png;base64,#{user.photo}", class="img-circle")
+                span.name=user.username
+              ul(class="dropdown-menu")
+                li 
+                  a(href="/profile") Profile
+
+                li 
+                  a(href="/logout") Logout
+    
+      .container-fluid
+        .row
+          .col-sm-12
+            block pageTitle
+        .row
+          .col-sm-12
+            .row
+              block body
+    script(type='text/javascript', src='js/jquery-2.1.3.min.js')
+    script(type='text/javascript', src='js/bootstrap.min.js')
+

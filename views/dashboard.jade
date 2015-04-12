@@ -1,0 +1,37 @@
+extends layout
+
+block pageTitle
+  h1.pageTitle Dashboard
+
+
+block body
+  .col-sm-6
+    .panel.panel-default
+      .panel-heading
+        h4.head Devices
+      ul.list-group
+
+        - if(devices.length == 0)
+          li.list-group-item You don't have any devices yet
+        - else 
+          - each device in devices
+            li.list-group-item
+              a.deviceName(href='/devices/#{device.id}')= device.devicename 
+
+
+      .panel-footer
+        a(href="/devices/add", class="btn btn-green pull-right") Add device
+        .clearfix
+
+  .col-sm-6
+    .panel.panel-default.account
+      .panel-heading
+        h4.head Contacts
+      ul.list-group
+        li.list-group-item
+          | To be done
+
+
+      .panel-footer
+        a(href="/contact/add", class="btn btn-green pull-right") Add
+        .clearfix

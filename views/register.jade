@@ -1,0 +1,29 @@
+extends layout
+
+block body
+  .row
+    .col-lg-4.col-lg-offset-4
+      .panel.panel-default#register
+        .panel-heading
+          h4 Register
+        form.bs-example.form-horizontal(method='post', action='')
+          .panel-body
+              fieldset
+                if error
+                  .alert.alert-dismissable.alert-danger.register-fail
+                    button.close(type='button', data-dismiss='alert') &times;
+                    p.
+                      #{error}
+
+                .form-group
+                  .col-lg-12
+                    input#username.form-control(name='username', type='email', placeholder='Email', autofocus)
+                .form-group
+                  .col-lg-12
+                    input#password.form-control(name='password', type='password', placeholder='Password')
+                .form-group
+                  .col-lg-12
+                    input#username.form-control(name='devicename', placeholder='Device name', autofocus)
+          .panel-footer
+            button.pull-right.btn.btn-green(type='submit') Register
+            .clearfix
