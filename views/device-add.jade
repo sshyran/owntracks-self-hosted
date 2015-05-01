@@ -1,7 +1,4 @@
 extends layout
-block pageTitle
-  h1.pageTitle 
-
 
 block body
   .col-sm-6.col-lg-offset-3
@@ -10,8 +7,8 @@ block body
         h4.head Add Device
       form.bs-example.form-horizontal(method='post', action='/devices/add')
         .panel-body
-            input#name.form-control(name='name', placeholder='Name', autofocus)
+            input#name.form-control(name='name', placeholder='Name', autofocus, required)
         .panel-footer
-          button.pull-right.btn.btn-green(type='submit') Create
+          button.pull-right.btn.btn-primary(type='submit') Create
           .clearfix
 

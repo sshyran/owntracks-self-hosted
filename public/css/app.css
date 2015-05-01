@@ -16,9 +16,10 @@ background-color: #FFF;
 min-height: 65px;
 line-height: 65px;
 
-margin-bottom: 0; 
+margin-bottom: 30px; 
 border: 0;
-border-bottom: 1px solid #eee; 
+border-bottom: 1px solid #E1E1E1; 
+border-radius: 0; 
 }
 
 .navbar a.navbar-brand {
@@ -57,7 +58,7 @@ ul.navbar-right, ul.navbar-right > li {
   font-size: 17px;
   font-weight: 400;
   padding: 0 15px;
-  border-left: 1px solid #eee;
+  border-left: 1px solid #E1E1E1;
 }
 
 #user .name {
@@ -65,8 +66,8 @@ ul.navbar-right, ul.navbar-right > li {
 }
 
 ul.dropdown-menu {
-  border: 1px solid #E3E1E1;
-  border-top: 1px solid #FFF;
+  border: 1px solid #E1E1E1;
+  border-top: 1px solid #E1E1E1;
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.04);
   border-radius: 1px;
 }
@@ -77,6 +78,7 @@ margin-top: -2px;
   height: 30px; 
   max-width: 30px;
   display: inline-block!important;
+border: 1px solid #CACACA; 
 }
 ul.navbar-right #user {
   line-height: 65px; 
@@ -123,15 +125,10 @@ a.list-group-item:hover, a.list-group-item:focus {
 }
 
 
-.panel#login, .panel#register{
-  margin-top: 15px; 
-}
-
-
 .panel-default>.panel-heading {
   color: #333;
   background-color: #fcfcfc;
-  border-color: #e2e9e6;
+  border-color: #E1E1E1;
     padding: 10px 15px; 
 
 }
@@ -139,7 +136,7 @@ a.list-group-item:hover, a.list-group-item:focus {
 .panel .head{
     margin: 0;
     line-height: 36px; 
-  color: #212121; 
+  color: #4D4D4D; 
   font-size: 24px;
   font-weight: normal;
 }
@@ -154,13 +151,13 @@ a.list-group-item:hover, a.list-group-item:focus {
 .panel-footer {
   padding: 10px 15px;
   background-color: #fcfcfc;
-  border-top: 1px solid #efefef;
+  border-top: 1px solid #E1E1E1;
 }
 
 .panel {
   margin-bottom: 20px;
   background-color: #fff;
-  border: 1px solid #e2e9e6;
+  border: 1px solid #E1E1E1;
 }
 
 .list-group-item {
@@ -175,7 +172,6 @@ a.list-group-item:hover, a.list-group-item:focus {
 
 .list-group-item > a {
     font-size: 15px; 
-    text-transform: capitalize;
 }
 
 dt.meta{
@@ -188,30 +184,32 @@ dt.meta{
   font-weight: normal;
 }
 
-.accessTokenLocked {
-  color: #535353; 
+.glyphicon.accessTokenLocked {
+  color: #5F5F5F; 
   font-size: 12px;
 }
 
-dl.device-details dt {
-  font-weight: normal; 
+
+
+dl dt {
+  font-weight: bold; 
   line-height: 30px; 
 }
 
-dl.device-details dd {
+dl dd {
   line-height: 30px; 
   font-size: 14px;
-  font-weight: bold;
-  font-family: "Courier New", Courier, monospace;
 }
 
 .accessTokenPlain {
-  color: #D9534F;
+  color: #BF3E3E;
   font-size: 14px;
   font-weight: bold;
-  font-family: "Courier New", Courier, monospace;
 }
 
+hr {
+margin-top: 15px; 
+margin-bottom: 15px;}
 hr.full {
   margin-right: -15px; 
   margin-left: -15px;
@@ -251,7 +249,7 @@ span.deviceUsername {
 .btn {
   font-weight: 500;
 }
-.btn-white {
+.btn-white, .btn-danger {
   color: #444;
   background-color: #fff;
   border-color: #cccccc;
@@ -349,3 +347,36 @@ dl.dl-horizontal {
 .btn.pull-right {
   margin-left: 15px; 
 }
+
+
+
+.alert-danger {
+  background-color: #d9534f;
+  border-color: #d43f3a;
+  color: #FFFFFF;
+  text-transform: uppercase;
+  font-size: 14px;
+}
+
+
+
+.alert-success {
+  background-color: #66BB6A;
+  border-color: #559A59;
+  color: #FFFFFF;
+  text-transform: uppercase; 
+  font-size: 14px; 
+}
+
+.flash .alert , .flash .success{
+  margin-bottom: 30px;
+}
+
+p {
+	line-height: 1.5em; 
+}
+
+p:last-child {
+  margin-bottom: 0; 
+}
+

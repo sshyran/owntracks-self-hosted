@@ -1,4 +1,5 @@
-var config = require('./config.json');
+var debug = require('debug')('traction:server');
+var http = require('http');
 var express = require('express');
 var router = express.Router();
 var path = require('path');
@@ -6,406 +7,377 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var app = express();
-var passport = require('passport'); 
-var LocalStrategy = require('passport-local').Strategy; 
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
 var session = require('express-session');
 var RedisStore = require('connect-redis')(session);
 var flash = require('connect-flash');
-var Sequelize = require('sequelize');
 var crypto = require('crypto');
-var request = require('request-promise').defaults({ encoding: null });
+var request = require('request-promise').defaults({
+		encoding : null
+});
+var mqtt = require('mqtt');
+var util = require('util');
 
-var passwordOptions = {rounds: 10000, keyLength: 127, saltLength: 127}
 
+var Db = new (require('./backend/db.js'))();
+var db = Db.connection;
+var models = Db.models;
+
+var Broker = new (require('./backend/broker.js'))();
+var broker = Broker.connection;
+
+var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended : false}));
 app.use(cookieParser());
 app.use(require('stylus').middleware(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-  store: new RedisStore({host: "localhost", port: 6379, prefix: "traction:sess:"}),
-  secret: config.SESSION_SECRET,
-}));
+		store : new RedisStore({
+			host : "localhost",
+			port : 6379,
+			prefix : "traction:sess:"
+		}),
+		secret : config.SESSION_SECRET,
+	}));
 app.use(flash());
-
-
-var db = new Sequelize(config.db_name, config.db_user, config.db_password, {
-    dialect: 'mariadb',
-  pool: {
-    max: 5,
-    min: 0,
-    idle: 10000
-  },
+app.use(function (req, res, next) {
+	res.locals.flash_success = req.flash('success');
+	res.locals.flash_error = req.flash('error');
+	next();
 });
 
-var User = db.define('User', {
-    username: Sequelize.STRING,
-    salt: Sequelize.STRING,
-    photo: Sequelize.TEXT,
-    password:       {
-        type: Sequelize.STRING,
-        set:  function(v) {
-          console.log(v)
-            var salt = crypto.randomBytes(passwordOptions.saltLength).toString('hex');
-	          var hashRaw = crypto.pbkdf2Sync(v, salt, passwordOptions.rounds, passwordOptions.keyLength)
+// Check supported crypto hashes
+debug("Supported hashes: " + crypto.getHashes());
 
-            this.setDataValue('salt', salt);
-            this.setDataValue('password', new Buffer(hashRaw, 'binary').toString('hex'));
+debug("Running pbkdf2 test vector for: sha1");
+var p = "password";
+var s = "salt";
+var kl = 20;
+var r = 1;
+var h = crypto.pbkdf2Sync(p, s, r, kl);
+var hf = new Buffer(h, 'binary').toString('hex');
+debug("computed output : " + hf);
+debug("expected output  : " + "0c60c80f961f0e71f3a9b524af6012062fe037a6");
 
-            // Todo: recrypt all access tokens
-        }
-    }
-  }, {
-    hooks: {
+debug("Running pbkdf2 test vector for: sha256");
+var p = "password";
+var s = "salt";
+var kl = 32;
+var r = 1;
+var h = crypto.pbkdf2Sync(p, s, r, kl, "sha256");
 
-    },
-    classMethods: {
-      findById: function(id) {
-        return User.find(id);
-      },
-  
-      findByUsername: function(username) {
-        return User.find({where: {username: username}});
-      }
-    }, instanceMethods: {
-      getDeviceTopic: function(device) {
-        return "public/"+this.getUsername()+"/"+device.devicename;
-      },
-      getDeviceLogin: function(device) {
-        return this.getUsername()+"-"+device.devicename;
-      },
-      getUsername: function() {
-        return this.username.replace("@", "-").replace(".", "-");
-      },
+crypto.pbkdf2(p, s, r, kl, 'sha256', function (err, key) {
+	if (err)
+		throw err;
+	debug("checking for pbkdf2 sha256 hashes");
+
+	debug("computed output : " + key.toString('hex'));
+	debug("expected output  : " + "120fb6cffcf8b32c120fb6cffcf8b32c120fb6cffcf8b32c120fb6cffcf8b32c");
+});
 
 
-      authenticate: function(password, done) {
-        var self = this; 
-        
-        var hashRaw = crypto.pbkdf2Sync(password, this.salt, passwordOptions.rounds, passwordOptions.keyLength);
-        if(!hashRaw)
-          return done(err);
-
-        if (new Buffer(hashRaw, 'binary').toString('hex') === self.password) {
-            return done(null, this);
-        } else {
-            return done(null, false, { message: 'Password is incorrect' });
-        }        
-      }, 
-      resolveGravatar: function() {
-        var queryUrl = 'http://www.gravatar.com/avatar/' +  crypto.createHash('md5').update(this.username.toLowerCase().trim()).digest('hex');
-        console.log(queryUrl);
-
-        return request({method: "GET", uri: queryUrl, resolveWithFullResponse: true}).then(function(response){
-          if(response.statusCode != 200)
-            return null;
-          return new Buffer(response.body, 'binary').toString('base64');
-        }).catch(function(error){
-          console.error(error);
-        })
-      }
-
-    }
-  }
-);
-
-var Device = db.define('Device', {
-    devicename: Sequelize.STRING,
-    accessTokenHashSalt: Sequelize.STRING,
-    accessTokenHash: Sequelize.STRING
-}, {
-  instanceMethods: {
-    resetToken: function(user) {
-      var token = Device.generateToken(); 
-      return this.updateAttributes({accessTokenHash: token.hash, accessTokenHashSalt: token.salt}).then(function(device) {
-        device.plainAccessToken = token.plain;
-        return device; 
-      });
-    }
-  },
-  classMethods: {
-    generateToken: function() {
-      var accessToken = crypto.randomBytes(16).toString('hex');
-      var accessTokenHashSalt = crypto.randomBytes(passwordOptions.saltLength).toString('hex');
-      var accessTokenHashRaw = crypto.pbkdf2Sync(accessToken, accessTokenHashSalt, passwordOptions.rounds, passwordOptions.keyLength)
-      var accessTokenHash = new Buffer(accessTokenHashRaw, 'binary').toString('hex')
-      return {plain: accessToken, salt: accessTokenHashSalt, hash: accessTokenHash}
-    },
-    createForUser: function(user, devicename) {
-      var token = Device.generateToken(); 
-      return Device.create({devicename: devicename, UserId: user.id, accessTokenHash: token.hash, accessTokenHashSalt: token.salt}).then(function(device){
-        device.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
-        return device; 
-      });
-    }
-  }
-}); 
-
-User.hasMany(Device);
-Device.belongsTo(User);
-
-sync = function() {
-        return User.sync({force: false}).then(function () {
-                return Device.sync({force: false});
-        })
-}
-sync(); 
-app.Device =  Device; 
-app.User = User; 
-app.db =  db; 
-
-
-
+// Setup session and login
 app.use(passport.initialize());
 app.use(passport.session());
 passport.use(new LocalStrategy(
-  function(username, password, done) {
-    return User.findByUsername(username).then(function(user) {
-      if (!user) { return done(null, false, { message: 'Unknown user ' + username }); }
+	function (username, password, done) {
+		return User.findByUsername(username).then(function (user) {
+			if (!user) {
+				return done(null, false, {
+					message : 'Unknown user ' + username
+				});
+			}
 
-      return user.authenticate(password, done);
-    }).catch(function(error) {
-      return done(error);
-    });
-
-  }
+			return user.authenticate(password, done);
+		}).catch (function (error) {
+			return done(error);
+		});
+	}
 ));
 
-
-passport.serializeUser(function(user, done) {
-  done(null, user.id);
+passport.serializeUser(function (user, done) {
+	done(null, user.id);
 });
 
-passport.deserializeUser(function(id, done) {
-  return User.findById(id).then(function(user) {
-    if(user)
-      done(null, user);
-  }).catch(function(error) {
-      done(error, null);
-  })
-});
-
-
-var syncPhoto = function(user) {
-  var queryUrl = 'http://www.gravatar.com/avatar/' +  crypto.createHash('md5').update(user.username.toLowerCase().trim()).digest('hex');
-  
-  return request(queryUrl).then(function(body){
-    console.log(body);
-    return body
-  }).catch(function(error){
-    console.log(error);
-  })
-
-  request.get(queryUrl, function (error, response, body) {
-  if (!error && response.statusCode == 200) {
-          data = "data:" + response.headers["content-type"] + ";base64," + new Buffer(body).toString('base64');
-          user.updateAttributes({photo: data})
-  } else {
-      }
-  })
-};
-
-
-
-app.post('/sync', function(req,res) {
-  if (!req.user) {
-    return res.redirect('/login');
-  }
-  syncPhoto(req.user); 
-   res.redirect("/")
-
-})
-
-// Render the registration page.
-app.get('/register', function(req, res) {
-  res.render('register', {title: 'Register', error: req.flash('error')[0]});
+passport.deserializeUser(function (id, done) {
+	return User.findById(id).then(function (user) {
+		if (user)
+			done(null, user);
+	}).catch (function (error) {
+		done(error, null);
+	})
 });
 
 
-app.get('/devices/add', function(req, res){
-  if(!req.user)
-    return res.redirect("/login") 
+// View routes
+app.post('/profile/sync', function (req, res) {
+	if (!req.user) {
+		return res.redirect('/login');
+	}
 
-  return res.render('devices-add', {user: req.user});
-
+	req.user.updateFaceAndDevices().then(function () {
+		req.flash("success", "Profile synchronized.");
+		res.redirect("/profile");
+	})
 })
 
-app.post('/devices/add', function(req, res){
-  if(!req.user)
-    return res.redirect("/login") 
-
-  var name = req.body.name;
-  if(!name) {
-    throw new Error("devicename is required to add a new device");
-  }
-
- return Device.createForUser(req.user, name).then(function(device){
-    req.session.plainAccessToken = device.plainAccessToken; 
-    device.plainAccessToken = undefined; 
-    return res.redirect('/devices/'+device.id);
-  }).catch(function(error){
-    console.error(error);
-  })
-})
-
-app.post('/devices/:id/delete', function(req, res){
-  if(!req.user)
-    res.redirect("/login") 
-
-  Device.find(req.params.id).then(function(device){
-    if(!device)
-      res.redirect("/") 
-    if(device.UserId !== req.user.id) {
-      console.log("user not allowed to access device. UserId " + req.user.id + ", device.UserId " + device.UserId);
-    }
-
-    return device.destroy();
-  }).then(function(){
-    return res.redirect('/');
-  }).catch(function(error){
-    console.error(error);
-    res.redirect("/")
-  })
-})
-
-app.post('/devices/:id/reset', function(req, res){
-  if(!req.user)
-    res.redirect("/login") 
-
-  Device.find(req.params.id).then(function(device){
-    if(!device)
-      res.redirect("/") 
-    if(device.UserId !== req.user.id) {
-      console.log("user not allowed to access device. UserId " + req.user.id + ", device.UserId " + device.UserId);
-    }
-
-    return device.resetToken();
-  }).then(function(device){
-    req.session.plainAccessToken = device.plainAccessToken; 
-    device.plainAccessToken = undefined; 
-    return res.redirect('/devices/'+device.id);
-  }).catch(function(error){
-    console.error(error);
-    res.redirect("/")
-  })
-})
-
-app.get('/devices/:id', function(req, res){
-  if(!req.user)
-    res.redirect("/login") 
-
-  Device.find(req.params.id).then(function(device){
-    if(!device)
-      res.redirect("/") 
-    if(device.UserId !== req.user.id) {
-      console.log("user not allowed to access device. UserId " + req.user.id + ", device.UserId " + device.UserId);
-     res.redirect("/") 
-    }
-    var accessToken = req.session.plainAccessToken; 
-    req.session.plainAccessToken = undefined; 
-    res.render('device', {device: device, user: req.user, accessToken: accessToken});
-  })
-})
-
-app.post('/devices/delete', function(req, res){
-  if(!req.user)
-    res.redirect("/login") 
-})
-
-app.get('/start', function(req, res){
-  if(!req.user)
-    res.redirect("/login") 
-
-  console.log(req.session.device);
-  return res.render('start', {user: req.user, device: req.session.device});
-
-})
-
-app.get('/profile', function(req, res){
-  if(!req.user)
-    res.redirect("/login") 
-
-
-  res.render('profile', {user: req.user});
-})
-
-
-app.post('/register', function(req, res, next) {
-
-  var username = req.body.username;
-  var password = req.body.password;
-  var devicename = req.body.devicename;
-
-  // Grab user fields.
-  if (!username || !password || !devicename) {
-    return res.render('register', {title: 'Register', error: 'Missing a required field required.'});
-  }
-
-  var user; 
-  return User.create({username: username, password: password}).then(function(u){
-    user = u; 
-    return user.resolveGravatar(); 
-  }).then(function(gravatar) {
-     return user.updateAttributes({photo: gravatar});
-  }).then(function(){
-     return Device.createForUser(user, devicename)
-  }).then(function(device){
-      console.log("device access token: " + device.plainAccessToken);
-      return; 
-      return req.logIn(user, function(err) {
-        if (err) { console.log(err) ; next(err)}
-        req.session.device = device;  // Store device in session so first access token can be shown to user
-        console.log(req.session.device);
-        return res.redirect('/start');
-      });
-
-  }).catch(function(error){
-    console.error(error);
-  })
-
+app.get('/register', function (req, res) {
+	res.render('register');
 });
 
+app.get('/devices/add', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+		return res.render('device-add', {
+			user : req.user
+		});
+
+})
+
+app.post('/devices/add', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+		var devicename = req.body.name;
+	if (!devicename) {
+		req.flash("error", "A devicename is required to add a new device.");
+		return res.redirect("/devices/add");
+	}
+
+	console.log("creating device: " + devicename);
+
+	return req.user.addDev(devicename).then(function (device) {
+		req.session.plainAccessToken = device.plainAccessToken;
+		device.plainAccessToken = undefined;
+		req.flash("success", "Device added");
+		return res.redirect('/devices/' + device.id);
+	}).catch (function (error) {
+		console.error(error);
+	})
+})
+
+app.post('/devices/:id/delete', function (req, res) {
+	if (!req.user)
+		res.redirect("/login")
+
+		Device.find(req.params.id).then(function (device) {
+			if (!device || device.UserId !== req.user.id) {
+				req.flash("error", "Deleting the device failed.");
+				return res.redirect("/");
+			}
+
+			device.clearFace(req.user);
+			return device.destroy();
+		}).then(function () {
+			req.flash("success", "Device deleted.");
+			return res.redirect('/');
+		}).catch (function (error) {
+			req.flash("error", "Deleting the device failed with error: " + error);
+			return res.redirect("/")
+		})
+})
+
+app.post('/devices/:id/reset', function (req, res) {
+	if (!req.user)
+		res.redirect("/login")
+
+		Device.find(req.params.id).then(function (device) {
+			if (!device || device.UserId !== req.user.id) {
+				req.flash("error", "Resetting the device credentials failed.");
+				return res.redirect("/")
+			}
+
+			return device.resetToken();
+		}).then(function (device) {
+			req.session.plainAccessToken = device.plainAccessToken;
+			device.plainAccessToken = undefined;
+			req.flash("success", "New device cretentials generated.");
+			return res.redirect('/devices/' + device.id);
+		}).catch (function (error) {
+			console.error(error);
+			res.redirect("/")
+		})
+})
+
+app.get('/devices/:id', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+		Device.find(req.params.id).then(function (device) {
+			if (!device || device.UserId !== req.user.id) {
+				req.flash("error", "Access denied");
+				return res.redirect("/")
+			}
+
+			var accessToken = req.session.plainAccessToken;
+			var firstStart = req.session.firstStart;
+
+			// Clean up session
+			req.session.firstStart = undefined
+				req.session.plainAccessToken = undefined;
+			res.render('device', {
+				device : device,
+				user : req.user,
+				accessToken : accessToken,
+				firstStart : firstStart != undefined
+			});
+		})
+})
+
+app.get('/profile', function (req, res) {
+	if (!req.user)
+		res.redirect("/login")
+
+		res.render('profile', {
+			user : req.user
+		});
+})
+
+app.get('/profile/edit', function (req, res) {
+	if (!req.user)
+		res.redirect("/login")
+
+		res.render('profile-edit', {
+			user : req.user
+		});
+})
+
+app.post('/profile/edit', function (req, res, next) {
+	if (!req.user)
+		res.redirect("/login")
+
+		var currentPassword = req.body.currentPassword;
+
+	var email = req.body.email;
+	var newPassword = req.body.newPassword;
+	var newPasswordRepeat = req.body.newPasswordRepeat;
+
+	if (email == req.user.email && !newPassword) {
+		req.flash('error', "There was nothing to update");
+		return res.redirect('/profile/edit');
+	}
+
+	req.user.authenticate(currentPassword, function (error, user, message) {
+		if (error || !user) {
+			req.flash('error', "Incorrect current password");
+			return res.redirect('/profile/edit');
+		}
+
+		if (newPassword != newPasswordRepeat) {
+			req.flash("error", "New passwords do not match");
+			return res.redirect('/profile/edit');
+		}
+
+		var update = {};
+		if (email)
+			update['email'] = email;
+
+		if (newPassword)
+			update['password'] = newPassword
+
+				return user.updateAttributes(update).then(function () {
+					req.flash("success", "Profile updated.");
+					return res.redirect('/profile');
+				}).catch (function (error) {
+
+					req.flash("error", "Profile update failed: " + error);
+					return res.redirect('/profile/edit');
+				})
+	});
+})
+
+app.post('/register', function (req, res, next) {
+
+	var username = req.body.username;
+	var email = req.body.email;
+	var password = req.body.password;
+	var devicename = req.body.devicename;
+
+	if (!username || !password || !devicename || !email) {
+		req.flash("error", "Missing a required field");
+		return res.render('register');
+	}
+
+	var user;
+
+	return User.create({
+		username : username,
+		email : email,
+		password : password
+	}).then(function (u) {
+		user = u;
+		return user.updateFace();
+	}).then(function (user) {
+		return user.addDev(devicename)
+	}).then(function (device) {
+		console.log("device access token: " + device.plainAccessToken);
+		return req.logIn(user, function (err) {
+			if (err) {
+				console.log(err);
+				next(err)
+			}
+
+			req.session.plainAccessToken = device.plainAccessToken;
+			device.plainAccessToken = undefined;
+
+			req.session.firstStart = true;
+
+			return res.redirect('/devices/' + device.id);
+		});
+
+	}).catch (function (error) {
+		req.flash("error", "Registration failed.");
+		console.error(error);
+		return res.redirect("/register");
+	})
+
+});
 
 // Render the login page.
-app.get('/login', function(req, res) {
-  res.render('login', {title: 'Login', error: req.flash('error')[0]});
+app.get('/login', function (req, res) {
+	res.render('login', {
+		title : 'Login',
+		error : req.flash('error')[0]
+	});
 });
-
 
 // Authenticate a user.
-app.post('/login', passport.authenticate('local', 
-  { successRedirect: '/',failureRedirect: '/login', session: true }
-)); 
-
+app.post('/login', passport.authenticate('local', {
+		successRedirect : '/',
+		failureRedirect : '/login',
+		session : true,
+		failureFlash : 'Invalid username or password.'
+	}));
 
 // Logout the user, then redirect to the home page.
-app.get('/logout', function(req, res) {
-  req.logout();
-  res.redirect('/');
+app.get('/logout', function (req, res) {
+	req.logout();
+	res.redirect('/');
 });
 
-app.get('/', function(req, res) {
-  if(!req.user)
-    return res.redirect("/login"); 
+app.get('/', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login");
 
-  req.app.Device.findAll({where: {UserId: req.user.id}}).then(function(devices){
-    res.render('dashboard', {user: req.user, devices: devices});
-  
-  });
-  
+	req.user.getDevices().then(function (devices) {
+		res.render('dashboard', {
+			user : req.user,
+			devices : devices
+		});
+	});
 });
-
-
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  var err = new Error('Not Found');
-  err.status = 404;
-  next(err);
+app.use(function (req, res, next) {
+	var err = new Error('Not Found');
+	err.status = 404;
+	next(err);
 });
 
 // error handlers
@@ -413,24 +385,80 @@ app.use(function(req, res, next) {
 // development error handler
 // will print stacktrace
 if (app.get('env') === 'development') {
-  app.use(function(err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-      message: err.message,
-      error: err
-    });
-  });
+	app.use(function (err, req, res, next) {
+		res.status(err.status || 500);
+		res.render('error', {
+			message : err.message,
+			error : err
+		});
+	});
 }
 
 // production error handler
 // no stacktraces leaked to user
-app.use(function(err, req, res, next) {
-  res.status(err.status || 500);
-  res.render('error', {
-    message: err.message,
-    error: {}
-  });
+app.use(function (err, req, res, next) {
+	res.status(err.status || 500);
+	res.render('error', {
+		message : err.message,
+		error : {}
+	});
 });
 
 
-module.exports = app;
+
+// Setup and run server
+var port = normalizePort(config.port || '3000');
+app.set('port', port);
+var server = http.createServer(app);
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+function normalizePort(val) {
+	var port = parseInt(val, 10);
+
+	if (isNaN(port)) {
+		// named pipe
+		return val;
+	}
+
+	if (port >= 0) {
+		// port number
+		return port;
+	}
+
+	return false;
+}
+
+function onError(error) {
+	if (error.syscall !== 'listen') {
+		throw error;
+	}
+
+	var bind = typeof port === 'string'
+		 ? 'Pipe ' + port
+		 : 'Port ' + port;
+
+	// handle specific listen errors with friendly messages
+	switch (error.code) {
+	case 'EACCES':
+		console.error(bind + ' requires elevated privileges');
+		process.exit(1);
+		break;
+	case 'EADDRINUSE':
+		console.error(bind + ' is already in use');
+		process.exit(1);
+		break;
+	default:
+		throw error;
+	}
+}
+
+function onListening() {
+	var addr = server.address();
+	var bind = typeof addr === 'string'
+		 ? 'pipe ' + addr
+		 : 'port ' + addr.port;
+	debug('Listening on ' + bind);
+}

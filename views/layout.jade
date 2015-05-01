@@ -27,13 +27,22 @@ html
                   a(href="/logout") Logout
     
       .container-fluid
+        block flash
+        - var flashLength = 6; 
+        - if(flash)
+          - flashLength = flash; 
+        - if(flash_error.length > 0)
+          .row.flash
+            div(class="col-lg-#{flashLength} col-lg-offset-#{Math.floor((12-flashLength)/2)}")
+              .alert.alert-danger !{flash_error}
+        - if(flash_success.length > 0)
+          .row.flash
+            div(class="col-lg-#{flashLength} col-lg-offset-#{Math.floor((12-flashLength)/2)}")
+              .alert.alert-success !{flash_success}
+
         .row
           .col-sm-12
-            block pageTitle
-        .row
-          .col-sm-12
-            .row
-              block body
-    script(type='text/javascript', src='js/jquery-2.1.3.min.js')
-    script(type='text/javascript', src='js/bootstrap.min.js')
+            block body
+    script(type='text/javascript', src='/js/jquery-2.1.3.min.js')
+    script(type='text/javascript', src='/js/bootstrap.min.js')
 

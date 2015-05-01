@@ -1,10 +1,24 @@
 extends layout
 
+block flash
+  - var flash = 4
+
 block body
   .row
     .col-lg-4.col-lg-offset-4
-      .panel.panel-default
+      .panel.panel-default#profile
         .panel-heading
           h4 Profile
         .panel-body
-          | To be done
+          dl.dl-horizontal
+            dt Username
+            dd= user.username
+            dt Mail
+            dd= user.email
+        .panel-footer
+          form.bs-example.form-horizontal(method='post', action='/profile/delete')
+            button.pull-left.btn.btn-danger(type='submit', value="delete") Delete
+          a.btn.btn-white.pull-right(href='/profile/edit') Edit
+          form.bs-example.form-horizontal(method='post', action='/profile/sync')
+            button.pull-right.btn.btn-white(type='submit', value="delete") Sync
+          .clearfix
