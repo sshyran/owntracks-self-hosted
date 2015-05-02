@@ -1,4 +1,14 @@
+var crypto = require('crypto');
+var config = require('../config.json')
+var util = require('util')
+var request = require('request-promise').defaults({
+		encoding : null
+});
+
 module.exports = function (sequelize, DataTypes) {
+	var app = sequelize.app; 
+
+
 	var User = sequelize.define('User', 
 		{
 			username : {
@@ -38,10 +48,18 @@ module.exports = function (sequelize, DataTypes) {
 		}, {
 			hooks : {},
 			classMethods : {
-				associate: function(){
-					User.hasMany(models.Device)
+				associate: function(models){
+					User.hasMany(models.Device, {foreignKey: "userId"})
 
-					User.hasMany(models.User, {through: 'Shares', as: 'tracking'});
+					//this user is tracking bar (foo has bar as)
+					//trackingUserId in Share is foo id 
+					//trackedUserId in Share bar id 
+
+					// bar is tracked by foo  (bar belongs to foo)
+					//
+					User.hasMany(models.User, {as: "trackedUsers", foreignKey: 'trackingUserId', otherKey: "trackedUserId", through: models.Share})
+					User.belongsToMany(models.User, {as: "trackingUsers", foreignKey: 'trackedUserId', otherKey: "trackingUserId", through: models.Share})
+	
 
 					},
 				findById : function (id) {
@@ -139,21 +157,34 @@ module.exports = function (sequelize, DataTypes) {
 					})
 				},
 
+				shareDev: function(device, toUser, rw, accepted) {
+					var topic = device.getTopic(this); 
+					if(this.userId == toUser.id)
+						topic += "/#";
+
+					return app.db.models.Share.create({trackingUserId: toUser.id, trackedDeviceDevicename: device.devicename, trackedDeviceTopic: topic, accepted: (accepted || false), permissions: (rw || '1'), trackedUserId: this.id, trackedDeviceId: device.id});
+				},
+
 				addDev : function (name) {
-					var token = Device.generateToken();
+					var token = app.db.models.Device.generateToken();
 					var self = this;
+					var newDevice; 
 					console.log(token);
 					console.log(name);
-					return Device.create({
+					return app.db.models.Device.create({
 						devicename : name,
-						UserId : self.id,
+						userId : self.id,
 						accessToken : token.pbkdf2
 					}).then(function (device) {
-						device.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
-						return device;
-					}).then(function (device) {
-						device.updateFace(self);
-						return device;
+						newDevice = device; 
+						newDevice.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
+
+						return self.shareDev(newDevice, self, '2', true);
+						//return app.db.models.Share.create({trackingUserId: self.id, trackedDeviceDevicename: newDevice.devicename, trackedDeviceTopic: newDevice.getTopic(self), accepted: true, permissions: '2', trackedUserId: self.id, trackedDeviceId: newDevice.id});
+
+					}).then(function () {
+						newDevice.updateFace(self);
+						return newDevice;
 					});
 				},
 			}

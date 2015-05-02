@@ -5,45 +5,49 @@ var debug = require('debug')('traction:db');
 var fs = require('fs');
 var path = require('path');
 
-models = {};
-
-var db = new Sequelize(config.db_name, config.db_user, config.db_password, {
-	dialect: 'mariadb',
-	pool: {
-		max: 5,
-		min: 0,
-		idle: 10000
-	},
-	native: true, 
-});
-
-db.authenticate().then(function(err) {
-
-}).catch(function(error){
-	
-	console.error("Unable to connect: " + error);
-});
 
 
-debug("Loading models");
-fs.readdirSync(__dirname+"/../models").filter(function(file) {	
-	return (file.charAt(0) != '.' &&  file.indexOf('.js') != -1) && (file.indexOf('.swp') == -1)
-}).forEach(function(file){
-	var model = db.import(__dirname+"/../models/"+file);	
-	models[model.name] = model
-})
-
-debug("associating models");
-Object.keys(models).forEach(function(modelName) {
-	if ('associate' in models[modelName]) {
-		console.log("Associating model: " + modelName);
-		models[modelName].associate(models)
-	}
-})
 
 
-module.exports = function() {
-	this.Sequelize =  Sequelize;
-	this.connection = db;
-	this.models = models; 
+module.exports = function(app) {
+
+	app.db = {};
+	app.db.models = {}; 
+	app.db.Sequelize = Sequelize;
+	app.db.connection = new Sequelize(config.db.name, config.db.user, config.db.password, {
+		dialect: 'mariadb',
+		pool: {
+			max: 5,
+			min: 0,
+			idle: 10000
+		},
+		native: true, 
+	});
+	app.db.connection.app = app; 
+
+	app.db.connection.authenticate().then(function(err) {
+
+	}).catch(function(error){
+		
+		console.error("Unable to connect: " + error);
+	});
+
+
+	fs.readdirSync(__dirname+"/../models").filter(function(file) {	
+		return (file.charAt(0) != '.' &&  file.indexOf('.js') != -1) && (file.indexOf('.swp') == -1)
+	}).forEach(function(file){
+		var model = app.db.connection.import(__dirname+"/../models/"+file);	
+		app.db.models[model.name] = model
+	})
+
+	debug("Initializing models");
+	Object.keys(app.db.models).forEach(function(modelName) {
+
+		if ('associate' in app.db.models[modelName]) {
+			console.log("Associating model: " + modelName);
+			app.db.models[modelName].associate(app.db.models)
+		}
+	})
+
+
 }

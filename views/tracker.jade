@@ -1,0 +1,34 @@
+extends layout
+
+block flash 
+  - var flash = 6
+
+block body
+  .row
+    .col-sm-6.col-lg-offset-3
+      .panel.panel-default#tracker
+        .panel-heading
+          h4.head Tracker
+        .panel-body
+          dl.dl-horizontal.device-details
+            dt Tracking user
+            dd= trackingUser.username
+            dt Tracked user
+            dd You (#{user.username})
+            dt Tracked device
+            dd= share.trackedDeviceDevicename
+
+            dt Status
+            dd= share.accepted ? "Accepted" : "Pending"
+            hr.full
+            dt Topic
+            dd= share.trackedDeviceTopic
+            dt Permissions
+            dd= share.permissions == 1 ? "read" : "read/write" 
+
+        .panel-footer
+          form.bs-example.form-horizontal(method='post', action='/tracker/#{share.id}/delete')
+            button.pull-left.btn.btn-danger(type='submit', value="") Untrack
+
+          .clearfix
+

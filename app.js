@@ -1,4 +1,5 @@
 var debug = require('debug')('traction:server');
+var config = require('./config.json')
 var http = require('http');
 var express = require('express');
 var router = express.Router();
@@ -9,23 +10,12 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
+var crypto = require('crypto');
 var session = require('express-session');
 var RedisStore = require('connect-redis')(session);
 var flash = require('connect-flash');
-var crypto = require('crypto');
-var request = require('request-promise').defaults({
-		encoding : null
-});
 var mqtt = require('mqtt');
 var util = require('util');
-
-
-var Db = new (require('./backend/db.js'))();
-var db = Db.connection;
-var models = Db.models;
-
-var Broker = new (require('./backend/broker.js'))();
-var broker = Broker.connection;
 
 var app = express();
 app.set('views', path.join(__dirname, 'views'));
@@ -38,11 +28,11 @@ app.use(require('stylus').middleware(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
 		store : new RedisStore({
-			host : "localhost",
-			port : 6379,
-			prefix : "traction:sess:"
+			host : config.redis.host,
+			port : config.redis.port,
+			prefix : config.redis.prefix
 		}),
-		secret : config.SESSION_SECRET,
+		secret : config.session.secret,
 	}));
 app.use(flash());
 app.use(function (req, res, next) {
@@ -50,6 +40,14 @@ app.use(function (req, res, next) {
 	res.locals.flash_error = req.flash('error');
 	next();
 });
+
+
+
+
+
+require('./backend/db.js')(app);
+require('./backend/broker.js')(app);
+
 
 // Check supported crypto hashes
 debug("Supported hashes: " + crypto.getHashes());
@@ -86,7 +84,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 passport.use(new LocalStrategy(
 	function (username, password, done) {
-		return User.findByUsername(username).then(function (user) {
+		return app.db.models.User.findByUsername(username).then(function (user) {
 			if (!user) {
 				return done(null, false, {
 					message : 'Unknown user ' + username
@@ -105,7 +103,7 @@ passport.serializeUser(function (user, done) {
 });
 
 passport.deserializeUser(function (id, done) {
-	return User.findById(id).then(function (user) {
+	return app.db.models.User.findById(id).then(function (user) {
 		if (user)
 			done(null, user);
 	}).catch (function (error) {
@@ -140,6 +138,9 @@ app.get('/devices/add', function (req, res) {
 
 })
 
+
+
+
 app.post('/devices/add', function (req, res) {
 	if (!req.user)
 		return res.redirect("/login")
@@ -158,7 +159,9 @@ app.post('/devices/add', function (req, res) {
 		req.flash("success", "Device added");
 		return res.redirect('/devices/' + device.id);
 	}).catch (function (error) {
-		console.error(error);
+		req.flash("error", "The device could not be created");s
+		return res.redirect('/devices/add');
+
 	})
 })
 
@@ -166,8 +169,8 @@ app.post('/devices/:id/delete', function (req, res) {
 	if (!req.user)
 		res.redirect("/login")
 
-		Device.find(req.params.id).then(function (device) {
-			if (!device || device.UserId !== req.user.id) {
+		app.db.models.Device.find(req.params.id).then(function (device) {
+			if (!device || device.userId !== req.user.id) {
 				req.flash("error", "Deleting the device failed.");
 				return res.redirect("/");
 			}
@@ -187,8 +190,8 @@ app.post('/devices/:id/reset', function (req, res) {
 	if (!req.user)
 		res.redirect("/login")
 
-		Device.find(req.params.id).then(function (device) {
-			if (!device || device.UserId !== req.user.id) {
+		app.db.models.Device.find(req.params.id).then(function (device) {
+			if (!device || device.userId !== req.user.id) {
 				req.flash("error", "Resetting the device credentials failed.");
 				return res.redirect("/")
 			}
@@ -209,8 +212,8 @@ app.get('/devices/:id', function (req, res) {
 	if (!req.user)
 		return res.redirect("/login")
 
-		Device.find(req.params.id).then(function (device) {
-			if (!device || device.UserId !== req.user.id) {
+		app.db.models.Device.find(req.params.id).then(function (device) {
+			if (!device || device.userId !== req.user.id) {
 				req.flash("error", "Access denied");
 				return res.redirect("/")
 			}
@@ -228,6 +231,225 @@ app.get('/devices/:id', function (req, res) {
 				firstStart : firstStart != undefined
 			});
 		})
+})
+
+
+app.get('/trackers/add', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	req.user.getDevices().then(function (devices) {
+		if (devices.length == 0) {
+			req.flash("error", "Please add a device first");
+			return res.redirect("/")
+		}
+
+		return res.render('tracker-add', {
+			user : req.user,
+			devices: devices
+		});
+
+	})
+})
+
+
+app.post('/tracking/:id/accept', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	if(!req.params.id)
+		return res.redirect("/")
+
+
+	var trackedUser; 
+	var share; 
+	return app.db.models.Share.find(req.params.id).then(function(s){
+		share = s; 
+
+		if (!share || share.trackingUserId !== req.user.id) {
+			throw new Error("Access denied");
+		}
+
+		return share.updateAttributes({accepted: true});
+	}).then(function(){
+		req.flash("success", "Tracking accepted");
+		return res.redirect("/tracking/"+share.id);
+	}).catch(function(error){
+		req.flash("error", error.toString());
+		return res.redirect("/");
+	});
+})
+
+app.post('/tracking/:id/delete', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	if(!req.params.id)
+		return res.redirect("/")
+
+
+	var trackedUser; 
+	var share; 
+	return app.db.models.Share.find(req.params.id).then(function(s){
+		share = s; 
+
+		if (!share || share.trackingUserId !== req.user.id) {
+			throw new Error("Access denied");
+		}
+
+		return share.destroy();
+	}).then(function(){
+		req.flash("success", "Tracking removed");
+		return res.redirect("/");
+	}).catch(function(error){
+		req.flash("error", error.toString());
+		return res.redirect("/");
+	});
+})
+
+
+app.get('/tracking/:id', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	var share; 
+	return app.db.models.Share.find(req.params.id).then(function(s){
+			share = s; 
+
+
+			if (!share || share.trackingUserId !== req.user.id) {
+				throw new Error("Access denied");
+			}
+
+			return app.db.models.User.find(share.trackedUserId);
+		}).then(function(trackedUser){
+
+			return res.render('tracking', {
+				user : req.user, 
+				trackedUser: trackedUser,
+				share: share
+			});
+
+
+		}).catch(function(error){
+			req.flash("error", error.toString());
+			return res.redirect("/");
+		});
+
+
+})
+
+app.get('/trackers/:id', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	var share; 
+	return app.db.models.Share.find(req.params.id).then(function(s){
+		share = s; 
+		if (!share || share.trackedUserId !== req.user.id) {
+			throw new Error("Access denied");
+		}
+			
+
+		return app.db.models.User.find(share.trackingUserId);
+	}).then(function(trackingUser){
+		return res.render('tracker', {
+			user : req.user, 
+			trackingUser: trackingUser,
+			share: share
+		});
+
+
+	}).catch(function(error){
+		req.flash("error", error.toString());
+		return res.redirect("/");
+	});
+
+})
+
+app.post('/tracker/:id/delete', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	if(!req.params.id)
+		return res.redirect("/")
+
+
+	var trackedUser; 
+	var share; 
+	return app.db.models.Share.find(req.params.id).then(function(s){
+		share = s; 
+
+		if (!share || share.trackedUserId !== req.user.id) {
+			throw new Error("Access denied");
+		}
+
+		return share.destroy();
+	}).then(function(){
+		req.flash("success", "Tracker removed");
+		return res.redirect("/");
+	}).catch(function(error){
+		req.flash("error", error.toString());
+		return res.redirect("/");
+	});
+})
+
+
+app.post('/trackers/add', function (req, res) {
+	if (!req.user)
+		return res.redirect("/login")
+
+	var username = req.body.username;
+	var deviceId = req.body.deviceId;
+
+	console.log("deviceId: " +deviceId)
+	if (!username) {
+		req.flash("error", "A username is required to add a tracker");
+		return res.redirect("/devices/"+req.params.id+"/trackers/add");
+	}
+
+	if(!deviceId) {
+		req.flash("error", "A device is required to add a tracker");
+		return res.redirect("/");
+	}
+
+	var device; 
+	var targetUser; 
+
+
+
+	return app.db.models.Device.find(deviceId).then(function (d) {
+		device = d;
+
+		if (!device || device.userId !== req.user.id) {
+			throw new Error("Access denied");
+		}
+
+
+		return app.db.models.User.findOne({where: {username: username}});
+
+	}).then(function(t){
+		targetUser = t;
+
+		if(!targetUser) {
+			throw new Error("The specified user does not exist");
+		}
+
+		return app.db.models.Share.find({where: {trackedUserId: req.user.id, trackingUserId: targetUser.id, trackedDeviceId: device.id}})
+	}).then(function(share){
+		if(share) {
+			throw new Error("This device is already tracked by " + targetUser.username);
+		}
+
+		return req.user.shareDev(device, targetUser);
+	}).then(function(){
+		req.flash("success", "The user has been invited to track your device");
+		return res.redirect("/");
+	}).catch(function(error){
+		req.flash("error", error.toString());
+		return res.redirect("/trackers/add");
+
+	})
 })
 
 app.get('/profile', function (req, res) {
@@ -306,7 +528,7 @@ app.post('/register', function (req, res, next) {
 
 	var user;
 
-	return User.create({
+	return app.db.models.User.create({
 		username : username,
 		email : email,
 		password : password
@@ -365,10 +587,23 @@ app.get('/', function (req, res) {
 	if (!req.user)
 		return res.redirect("/login");
 
-	req.user.getDevices().then(function (devices) {
+	var trackedUsers;
+	var trackingUsers;
+
+	req.user.getTrackedUsers({include: [app.db.models.Device]}).then(function(t){
+		trackedUsers = t; 
+		return req.user.getTrackingUsers();
+	}).then(function(t){
+		trackingUsers = t; 
+		return req.user.getDevices();
+	}).then(function (devices) {
+
 		res.render('dashboard', {
 			user : req.user,
-			devices : devices
+			devices : devices,
+			trackingUsers: trackingUsers,
+			trackedUsers: trackedUsers
+			
 		});
 	});
 });
@@ -385,7 +620,7 @@ app.use(function (req, res, next) {
 // development error handler
 // will print stacktrace
 if (app.get('env') === 'development') {
-	app.use(function (err, req, res, next) {
+		app.use(function (err, req, res, next) {
 		res.status(err.status || 500);
 		res.render('error', {
 			message : err.message,

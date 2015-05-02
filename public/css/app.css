@@ -78,7 +78,6 @@ margin-top: -2px;
   height: 30px; 
   max-width: 30px;
   display: inline-block!important;
-border: 1px solid #CACACA; 
 }
 ul.navbar-right #user {
   line-height: 65px; 
@@ -303,6 +302,7 @@ span.deviceUsername {
 }
 .img-circle {
   border-radius: 50%;
+  border: 1px solid #CACACA;
 }
 
 .list-group li {
@@ -348,7 +348,9 @@ dl.dl-horizontal {
   margin-left: 15px; 
 }
 
-
+.btn.pull-left {
+  margin-right: 15px; 
+}
 
 .alert-danger {
   background-color: #d9534f;
@@ -357,6 +359,7 @@ dl.dl-horizontal {
   text-transform: uppercase;
   font-size: 14px;
 }
+
 
 
 
@@ -380,3 +383,24 @@ p:last-child {
   margin-bottom: 0; 
 }
 
+
+ul.tracking .img-circle, ul.trackers .img-circle {
+  height: 20px;
+  margin-right: 10px; 
+}
+
+ul.tracking .label, ul.trackers .label {
+  line-height: 17px; 
+}
+
+
+select {
+    -webkit-appearance: none;
+  -webkit-border-radius: 0px;
+
+}
+
+
+.panel > .list-group:last-child .list-group-item:last-child, .panel > .panel-collapse > .list-group:last-child .list-group-item:last-child {
+  border-radius: 0;
+}

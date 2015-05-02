@@ -1,12 +1,23 @@
+var crypto = require('crypto');
+var config = require('../config.json')
+var util = require('util')
+
 module.exports = function (sequelize, DataTypes) {
+	var app = sequelize.app; 
+
 	var Device = sequelize.define('Device', 
 		{
 			devicename : {
 				type : DataTypes.STRING,
-				allowNull : false
+				allowNull : false,
+				unique: 'userId_devicename_unique'
+			},
+			userId: {
+				type: DataTypes.INTEGER, 
+				unique: 'userId_devicename_unique'
 			},
 			accessToken : DataTypes.STRING,
-		}, {
+		}, {			 
 			instanceMethods : {
 				resetToken : function (user) {
 					var token = Device.generateToken();
@@ -26,20 +37,20 @@ module.exports = function (sequelize, DataTypes) {
 						"name" : user.username,
 						"face" : user.photo
 					};
-					return mqttConnection.publish(this.getFaceTopic(user), JSON.stringify(face), {
+					return app.broker.connection.publish(this.getFaceTopic(user), JSON.stringify(face), {
 						qos : 0,
 						retain : true
 					});
 				},
 
 				clearFace : function (user) {
-					return mqttConnection.publish(this.getFaceTopic(user), "", {
+					return app.broker.connection.publish(this.getFaceTopic(user), "", {
 						qos : 0,
 						retain : true
 					});
 				},
 				getTopic : function (user) {
-					return config.topic_prefix + "/" + user.getUsername() + "/" + this.devicename;
+					return config.broker.prefix + "/" + user.getUsername() + "/" + this.devicename;
 				},
 				getFaceTopic : function (user) {
 					return this.getTopic(user) + "/info";
@@ -50,9 +61,9 @@ module.exports = function (sequelize, DataTypes) {
 
 			},
 			classMethods : {
-				associate: function(){
-					Device.belongsTo(models.User);
-					Device.belongsToMany(models.Share);
+				associate: function(models){
+					Device.belongsTo(models.User, {foreignKey: "userId"});
+					Device.hasMany(models.Share, {foreignKey: 'trackedDeviceId'});
 				},
 				generateToken : function () {
 					var accessToken = crypto.randomBytes(16).toString('base64');
