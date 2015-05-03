@@ -527,6 +527,8 @@ app.post('/register', function (req, res, next) {
 	}
 
 	var user;
+	var device; 
+
 
 	return app.db.models.User.create({
 		username : username,
@@ -537,7 +539,10 @@ app.post('/register', function (req, res, next) {
 		return user.updateFace();
 	}).then(function (user) {
 		return user.addDev(devicename)
-	}).then(function (device) {
+	}).then(function (d) {
+		device = d; 
+		return app.db.models.Share.create({trackingUserId: user.id, topic: user.getRWTopic(), accepted: true, permissions: '2', trackedUserId: user.id, trackedDeviceId: device.id});
+	}).then(function(){
 		console.log("device access token: " + device.plainAccessToken);
 		return req.logIn(user, function (err) {
 			if (err) {

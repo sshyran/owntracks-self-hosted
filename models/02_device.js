@@ -50,8 +50,12 @@ module.exports = function (sequelize, DataTypes) {
 					});
 				},
 				getTopic : function (user) {
-					return config.broker.prefix + "/" + user.getUsername() + "/" + this.devicename;
+					return user.getTopic()+ "/" + this.devicename;
 				},
+				getROTopic : function (user) {
+					return this.getTopic()+ "#";
+				},
+
 				getFaceTopic : function (user) {
 					return this.getTopic(user) + "/info";
 				},

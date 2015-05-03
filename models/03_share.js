@@ -8,13 +8,13 @@ module.exports = function (sequelize, DataTypes) {
 				autoIncrement: true,
 	      primaryKey: true
 			},
-			trackedDeviceTopic: {
+			topic: {
 				type : DataTypes.STRING,
 				allowNull: false
 			},
 			trackedDeviceDevicename: {
 				type : DataTypes.STRING,
-				allowNull: false
+				allowNull: true
 			},
 
 			accepted: {

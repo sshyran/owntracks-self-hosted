@@ -110,6 +110,14 @@ module.exports = function (sequelize, DataTypes) {
 					})
 				},
 
+				getTopic: function() {
+					return config.broker.prefix + "/" + this.getUsername();
+				},
+
+				getRWTopic: function() {
+					return config.broker.prefix + "/" + this.getUsername()+"/#";
+				},
+
 				getUsername : function () {
 					return this.username;
 				},
@@ -157,12 +165,8 @@ module.exports = function (sequelize, DataTypes) {
 					})
 				},
 
-				shareDev: function(device, toUser, rw, accepted) {
-					var topic = device.getTopic(this); 
-					if(this.userId == toUser.id)
-						topic += "/#";
-
-					return app.db.models.Share.create({trackingUserId: toUser.id, trackedDeviceDevicename: device.devicename, trackedDeviceTopic: topic, accepted: (accepted || false), permissions: (rw || '1'), trackedUserId: this.id, trackedDeviceId: device.id});
+				shareDev: function(device, toUser) {
+					return app.db.models.Share.create({trackingUserId: toUser.id, trackedDeviceDevicename: device.devicename, topic: device.getROTopic(this), accepted: false, permissions: '1', trackedUserId: this.id, trackedDeviceId: device.id});
 				},
 
 				addDev : function (name) {
@@ -179,8 +183,7 @@ module.exports = function (sequelize, DataTypes) {
 						newDevice = device; 
 						newDevice.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
 
-						return self.shareDev(newDevice, self, '2', true);
-						//return app.db.models.Share.create({trackingUserId: self.id, trackedDeviceDevicename: newDevice.devicename, trackedDeviceTopic: newDevice.getTopic(self), accepted: true, permissions: '2', trackedUserId: self.id, trackedDeviceId: newDevice.id});
+
 
 					}).then(function () {
 						newDevice.updateFace(self);
