@@ -53,7 +53,10 @@ module.exports = function (sequelize, DataTypes) {
 					return user.getTopic()+ "/" + this.devicename;
 				},
 				getROTopic : function (user) {
-					return this.getTopic()+ "#";
+					return this.getTopic(user)+ "/#";
+				},
+				getRWTopic : function (user) {
+					return this.getTopic(user)+ "/#";
 				},
 
 				getFaceTopic : function (user) {

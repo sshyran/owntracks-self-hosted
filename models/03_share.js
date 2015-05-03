@@ -8,10 +8,7 @@ module.exports = function (sequelize, DataTypes) {
 				autoIncrement: true,
 	      primaryKey: true
 			},
-			topic: {
-				type : DataTypes.STRING,
-				allowNull: false
-			},
+
 			trackedDeviceDevicename: {
 				type : DataTypes.STRING,
 				allowNull: true
@@ -21,25 +18,6 @@ module.exports = function (sequelize, DataTypes) {
 				type: DataTypes.BOOLEAN,
 				allowNull: false
 			},
-			permissions: {
-				type: DataTypes.ENUM('0', '1', '2'),
-				allowNull: false, 
-				defaulValue: '0'
-			},
-			// trackedUserId: {
-			// 	type: DataTypes.INTEGER, 
-			// 	unique: 'Shares_trackedUserId_trackingUserId_trackedDeviceId_unique'
-			// },
-			// trackingUserId: {
-			// 	type: DataTypes.INTEGER, 
-			// 	unique: 'Shares_trackedUserId_trackingUserId_trackedDeviceId_unique'
-			// },
-			// trackedDeviceId: {
-			// 	type: DataTypes.INTEGER, 
-			// 	unique: 'Shares_trackedUserId_trackingUserId_trackedDeviceId_unique'
-			// },
-
-
 		}, {
 		  indexes: [
 		    {
@@ -56,9 +34,6 @@ module.exports = function (sequelize, DataTypes) {
 			classMethods : {
 				associate: function(models){
 					Share.belongsTo(models.Device, {foreignKey: 'trackedDeviceId'});
-					//Share.belongsTo(models.User, {as: "trackedUser"});
-					//Share.belongsTo(models.User, {as: "trackingUser"});
-
 				}
 			}
 		}

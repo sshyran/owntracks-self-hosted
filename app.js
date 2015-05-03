@@ -541,8 +541,7 @@ app.post('/register', function (req, res, next) {
 		return user.addDev(devicename)
 	}).then(function (d) {
 		device = d; 
-		return app.db.models.Share.create({trackingUserId: user.id, topic: user.getRWTopic(), accepted: true, permissions: '2', trackedUserId: user.id, trackedDeviceId: device.id});
-	}).then(function(){
+
 		console.log("device access token: " + device.plainAccessToken);
 		return req.logIn(user, function (err) {
 			if (err) {

@@ -8,7 +8,7 @@ module.exports = function(app) {
 	app.broker = {};
 
 	var connectUri = 'mqtt://'+config.broker.host+":"+config.broker.port;
-	app.broker.connection  = mqtt.connect(connectUri, {keepalive: 30, clientId: config.broker.clientId, reconnectPeriod: 1000, username: config.db.user+"|"+config.db.device, password: config.broker.password});
+	app.broker.connection  = mqtt.connect(connectUri, {keepalive: 30, clientId: config.broker.clientId, reconnectPeriod: 1000, username: config.broker.user, password: config.broker.password});
 
 	app.broker.connection.on('connect', function () {
 		debug("connection established");
