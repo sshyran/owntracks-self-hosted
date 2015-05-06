@@ -34,9 +34,12 @@ module.exports = function (sequelize, DataTypes) {
 					console.log("updating device face of device: " + this.id);
 					var face = {
 						"_type" : "card",
-						"name" : user.username,
 						"face" : user.photo
 					};
+					if(user.username != "") {
+						face['name'] = user.fullname
+					}
+					
 					return app.broker.connection.publish(this.getFaceTopic(user), JSON.stringify(face), {
 						qos : 0,
 						retain : true

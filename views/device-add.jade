@@ -7,7 +7,7 @@ block body
         h4.head Add Device
       form.bs-example.form-horizontal(method='post', action='/devices/add')
         .panel-body
-            input#name.form-control(name='name', placeholder='Name', autofocus, required)
+            input#name.form-control(name='name', placeholder='Name', autofocus, required, pattern="[a-zA-Z0-9]+", oninvalid="this.setCustomValidity('Please enter a valid alphanumeric device name')", onchange="try{this.setCustomValidity('')}catch(e){}")
         .panel-footer
           button.pull-right.btn.btn-primary(type='submit') Create
           .clearfix

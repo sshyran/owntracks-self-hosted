@@ -144,9 +144,14 @@ app.post('/devices/add', function (req, res) {
 	if (!req.user)
 		return res.redirect("/login")
 
-		var devicename = req.body.name;
+	var devicename = req.body.name;
 	if (!devicename) {
 		req.flash("error", "A devicename is required to add a new device.");
+		return res.redirect("/devices/add");
+	}
+
+	if(devicename.match(/[^A-Za-z0-9]/)) {
+		req.flash("error", "The devicename may only contain alphanumeric characters");
 		return res.redirect("/devices/add");
 	}
 
@@ -484,13 +489,14 @@ app.post('/profile/edit', function (req, res, next) {
 	var email = req.body.email;
 	var newPassword = req.body.newPassword;
 	var newPasswordRepeat = req.body.newPasswordRepeat;
+	var fullname = req.body.fullname;
 
-	if (email == req.user.email && !newPassword) {
+	if (email != req.user.email && !newPassword && !fullname) {
 		req.flash('error', "There was nothing to update");
 		return res.redirect('/profile/edit');
 	}
 
-	req.user.authenticate(currentPassword, function (error, user, message) {
+	return req.user.authenticate(currentPassword, function (error, user, message) {
 		if (error || !user) {
 			req.flash('error', "Incorrect current password");
 			return res.redirect('/profile/edit');
@@ -505,18 +511,23 @@ app.post('/profile/edit', function (req, res, next) {
 		if (email)
 			update['email'] = email;
 
+		if (fullname)
+			update['fullname'] = fullname;
+
 		if (newPassword)
 			update['password'] = newPassword
 
-				return user.updateAttributes(update).then(function () {
-					req.flash("success", "Profile updated.");
-					return res.redirect('/profile');
-				}).catch (function (error) {
+		return user.updateAttributes(update).then(function(user){
+			return user.updateDeviceFaces();
+		}).then(function () {
+			req.flash("success", "Profile updated.");
+			return res.redirect('/profile');
+		}).catch (function (error) {
 
-					req.flash("error", "Profile update failed: " + error);
-					return res.redirect('/profile/edit');
-				})
-	});
+			req.flash("error", "Profile update failed: " + error);
+			return res.redirect('/profile/edit');
+		})
+	})
 })
 
 app.post('/register', function (req, res, next) {
@@ -525,11 +536,25 @@ app.post('/register', function (req, res, next) {
 	var email = req.body.email;
 	var password = req.body.password;
 	var devicename = req.body.devicename;
+	var fullname = req.body.fullname;
 
-	if (!username || !password || !devicename || !email) {
+	if (!username || !password || !devicename || !email | !fullname) {
 		req.flash("error", "Missing a required field");
 		return res.render('register');
 	}
+
+
+	if(username.match(/[^A-Za-z0-9]/)) {
+		req.flash("error", "The username may only contain alphanumeric characters");
+		return res.redirect('/register');
+	}
+
+
+	if(devicename.match(/[^A-Za-z0-9]/)) {
+		req.flash("error", "The devicename may only contain alphanumeric characters");
+			return res.redirect('/register');
+	}
+
 
 	var user;
 	var device; 
@@ -538,7 +563,8 @@ app.post('/register', function (req, res, next) {
 	return app.db.models.User.create({
 		username : username,
 		email : email,
-		password : password
+		password : password,
+		fullname: fullname
 	}).then(function (u) {
 		user = u;
 		return user.updateFace();

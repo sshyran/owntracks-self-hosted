@@ -38,8 +38,15 @@ namespace('traction', function () {
 				console.log("Fixing indices of Shares table");
 				return app.db.connection.query("DROP INDEX `Shares_trackedUserId_trackingUserId_unique` on `Shares`");
 			}).then(function() {
+			        	return app.db.models.User.create({
+       					         username : config.broker.user.split("|")[0],
+               					 email : "undefined@example.org",
+               					 password : config.broker.password
+        				})
+
+				}).then(function(user))
 				return app.db.models.Permission.create({
-					username : config.broker.user.split("|")[0],
+					username : user.username,
 					topic : "#",
 					rw: "2"
 				})
