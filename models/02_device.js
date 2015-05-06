@@ -70,7 +70,7 @@ module.exports = function (sequelize, DataTypes) {
 			classMethods : {
 				associate: function(models){
 					Device.belongsTo(models.User, {foreignKey: "userId"});
-					Device.hasMany(models.Share, {foreignKey: 'trackedDeviceId'});
+					Device.hasMany(models.Share, {foreignKey: 'trackedDeviceId', onDelete: 'cascade'});
 				},
 				generateToken : function () {
 					var accessToken = crypto.randomBytes(16).toString('base64');

@@ -44,7 +44,6 @@ app.use(function (req, res, next) {
 
 
 
-
 require('./backend/db.js')(app);
 require('./backend/broker.js')(app);
 
@@ -177,7 +176,9 @@ app.post('/devices/:id/delete', function (req, res) {
 
 			device.clearFace(req.user);
 			return device.destroy();
-		}).then(function () {
+		}).then(function (device) {
+			//return app.db.models.Permission.destroy({where: {deviceId: device.id}})
+		}).then(function() {
 			req.flash("success", "Device deleted.");
 			return res.redirect('/');
 		}).catch (function (error) {
@@ -298,6 +299,8 @@ app.post('/tracking/:id/delete', function (req, res) {
 		}
 
 		return share.destroy();
+	}).then(function(share){
+                //return app.db.models.Permission.destroy({where: {shareId: share.id}})
 	}).then(function(){
 		req.flash("success", "Tracking removed");
 		return res.redirect("/");
@@ -385,6 +388,8 @@ app.post('/tracker/:id/delete', function (req, res) {
 		}
 
 		return share.destroy();
+	}).then(function(share){
+		//return app.db.models.Permission.destroy({where: {shareId: share.id}})
 	}).then(function(){
 		req.flash("success", "Tracker removed");
 		return res.redirect("/");

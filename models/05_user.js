@@ -49,7 +49,7 @@ module.exports = function (sequelize, DataTypes) {
 			hooks : {},
 			classMethods : {
 				associate: function(models){
-					User.hasMany(models.Device, {foreignKey: "userId"})
+					User.hasMany(models.Device, {foreignKey: "userId", onDelete: 'cascade'})
 
 					//this user is tracking bar (foo has bar as)
 					//trackingUserId in Share is foo id 

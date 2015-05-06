@@ -42,9 +42,9 @@ module.exports = function (sequelize, DataTypes) {
 			},
 			classMethods : {
 				associate: function(models){
-					Permission.belongsTo(models.Device, {foreignKey: 'deviceId'});
-					Permission.belongsTo(models.User, {foreignKey: 'userId'});
-					Permission.belongsTo(models.Share, {foreignKey: 'shareId'});
+					Permission.belongsTo(models.Device, {foreignKey: 'deviceId', onDelete: 'cascade'});
+					Permission.belongsTo(models.User, {foreignKey: 'userId', onDelete: 'cascade'});
+					Permission.belongsTo(models.Share, {foreignKey: 'shareId', onDelete: 'cascade'});
 
 				}
 			}
