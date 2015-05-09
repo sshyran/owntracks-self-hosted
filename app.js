@@ -46,7 +46,11 @@ app.use(function (req, res, next) {
 
 require('./backend/db.js')(app);
 require('./backend/broker.js')(app);
+require('./backend/statsd.js')(app);
+require('./backend/mailer.js')(app);
 
+
+app.statsd.increment('startups')
 
 // Check supported crypto hashes
 debug("Supported hashes: " + crypto.getHashes());
@@ -85,13 +89,16 @@ passport.use(new LocalStrategy(
 	function (username, password, done) {
 		return app.db.models.User.findByUsername(username).then(function (user) {
 			if (!user) {
+				app.statsd.increment("logins-failed");
 				return done(null, false, {
 					message : 'Unknown user ' + username
 				});
 			}
+			app.statsd.increment("logins-success");
 
 			return user.authenticate(password, done);
 		}).catch (function (error) {
+			app.statds.increment("logins-failed");
 			return done(error);
 		});
 	}
@@ -207,6 +214,8 @@ app.post('/devices/:id/reset', function (req, res) {
 			req.session.plainAccessToken = device.plainAccessToken;
 			device.plainAccessToken = undefined;
 			req.flash("success", "New device cretentials generated.");
+			app.mailer.sendDeviceTokenResetNotification({user: req.user, device: device}, function(error, responseStatusMessage, html, text){});
+
 			return res.redirect('/devices/' + device.id);
 		}).catch (function (error) {
 			console.error(error);

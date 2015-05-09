@@ -18,6 +18,17 @@ module.exports = function (sequelize, DataTypes) {
 			},
 			accessToken : DataTypes.STRING,
 		}, {			 
+			hooks: {
+				afterCreate: function(instance, options, fn){
+					app.statsd.increment("devices");
+					fn();
+				},
+				afterDestroy: function(instance, options, fn){
+                                        app.statsd.decrement("devices");
+					fn();
+                                }
+
+			},	
 			instanceMethods : {
 				resetToken : function (user) {
 					var token = Device.generateToken();

@@ -19,6 +19,17 @@ module.exports = function (sequelize, DataTypes) {
 				allowNull: false
 			},
 		}, {
+		hooks: {
+                                afterCreate: function(instance, options, fn){
+                                        app.statsd.increment("shares");
+                                        fn();
+                                },
+                                afterDestroy: function(instance, options, fn){
+                                        app.statsd.decrement("shares");
+                                        fn();
+                                }
+
+                        },
 		  indexes: [
 		    {
 		      name: 'Shares_trackedUserId_trackingUserId_trackedDeviceId_unique',

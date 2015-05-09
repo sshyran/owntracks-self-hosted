@@ -46,7 +46,21 @@ module.exports = function (sequelize, DataTypes) {
 				allowNull : false
 			}
 		}, {
-			hooks : {},
+			hooks: {
+        afterCreate: function(instance, options, fn){
+          app.statsd.increment("users");
+          app.mailer.sendRegisterNotification(instance, function(error, responseStatusMessage, html, text){
+          	console.log("Registration email send: " + error + " " + responseStatusMessage + " " + text)
+          	fn();
+
+          })
+        },
+        afterDestroy: function(instance, options, fn){
+          app.statsd.decrement("users");
+          fn();
+        }
+
+      },
 			classMethods : {
 				associate: function(models){
 					User.hasMany(models.Device, {foreignKey: "userId", onDelete: 'cascade'})
