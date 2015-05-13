@@ -1,0 +1,24 @@
+extends layout
+
+block flash
+  - var flash = 4
+
+block body
+  .row
+    .col-lg-4.col-lg-offset-4
+      .panel.panel-default#profile
+        .panel-heading
+          h4 Reset password
+        form.bs-example.form-horizontal(method='post', action='/profile/reset/#{token}')
+          .panel-body
+            fieldset
+              .form-group
+                .col-lg-12
+                  input#currentPassword.form-control(name='newPassword', type='password', placeholder='Password', required)
+              .form-group
+                .col-lg-12
+                  input#newPassword.form-control(name='newPasswordRepeat', type='password', placeholder='Password', required)
+
+          .panel-footer
+            button.pull-right.btn.btn-primary(type='submit', value="delete") Update
+            .clearfix

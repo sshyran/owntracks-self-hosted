@@ -170,7 +170,12 @@ app.post('/devices/add', function (req, res) {
 		req.flash("success", "Device added");
 		return res.redirect('/devices/' + device.id);
 	}).catch (function (error) {
-		req.flash("error", "The device could not be created");s
+		console.error(error);
+		if(error.name === "SequelizeUniqueConstraintError") {
+			req.flash("error", "The device already exists");
+		}else {
+			req.flash("error", "The device could not be created");s
+		}
 		return res.redirect('/devices/add');
 
 	})
@@ -465,7 +470,7 @@ app.post('/trackers/add', function (req, res) {
 		req.flash("success", "The user has been invited to track your device");
 		return res.redirect("/");
 	}).catch(function(error){
-		req.flash("error", error.toString());
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/trackers/add");
 
 	})
@@ -487,6 +492,140 @@ app.get('/profile/edit', function (req, res) {
 		res.render('profile-edit', {
 			user : req.user
 		});
+})
+app.get('/profile/recover', function (req, res) {
+	// Not for logged in users
+	if (req.user)
+		res.redirect("/")
+
+	res.render('profile-recover', {
+	});
+})
+
+app.post('/profile/recover', function (req, res) {
+	// Not for logged in users
+	if (req.user)
+		res.redirect("/")
+
+	var email = req.body.email;
+	if(!email) {
+		req.flash('error', "An email address is required.");
+		res.redirect('/');
+	}
+
+	return app.db.models.User.findOne({where: {email: email}}).then(function (user){
+		if(!user) {
+			throw "not-found"
+		}
+
+    var tokenRaw = crypto.randomBytes(20);
+    var token = tokenRaw.toString('hex');
+
+    var expires = new Date();
+    expires.setTime(expires.getTime()+3600000);
+
+    return user.updateAttributes({passwordResetToken: token, passwordResetTokenExpires: expires});
+
+
+	}).then(function(user) {
+		app.mailer.sendPasswordResetLink(user, function(){});
+		req.flash('success', "We send you a recovery link");
+		res.redirect('/profile/recover');
+
+	}).catch(function(error) {
+		console.error(error);
+
+		if(error == "not-found") {
+			// Don't give away that the user was not found
+			req.flash('success', "We send you a recovery link");
+			res.redirect('/profile/recover');
+
+		}
+	})
+
+})
+app.get('/profile/reset/:token', function (req, res) {
+	// Not for logged in users
+	if (req.user)
+		res.redirect("/")
+
+	if(!req.params.token) {
+		req.flash("error", "No reset token was provided");
+		return res.redirect("/profile/recover");
+	}
+
+
+	return app.db.models.User.findOne({where: {passwordResetToken: req.params.token, passwordResetTokenExpires: {gt: new Date()}}}).then(function(user) {
+		if(!user) {
+			throw "not-found-or-expired";
+		}
+
+		return res.render('profile-reset', {
+			user: user,
+			token: req.params.token
+		});
+
+	}).catch(function(error) {
+		console.error(error);
+    req.flash('error', 'Password reset token is invalid or has expired.');
+		return res.redirect("/profile/recover");
+	})
+});
+
+app.post('/profile/reset/:token', function (req, res) {
+	// Not for logged in users
+	if (req.user)
+		res.redirect("/")
+
+	var password = req.body.newPassword; 
+	var passwordRepeat = req.body.newPasswordRepeat; 
+
+	if(!req.params.token) {
+		req.flash("error", "No reset token was provided");
+		return res.redirect("/profile/recover");
+	}
+
+	if(!password || !passwordRepeat) {
+		req.flash("error", "A password is requried");
+		return res.redirect("/profile/reset/"+req.params.token);
+	}
+
+	if(password !== passwordRepeat) {
+		req.flash("error", "Passwords do not match");
+		return res.redirect("/profile/reset/"+req.params.token);
+	}
+
+	return app.db.models.User.findOne({where: {passwordResetToken: req.params.token, passwordResetTokenExpires: {gt: Date.now()}}}).then(function(user) {
+		if(!user) {
+			throw "not-found-or-expired";
+		}
+
+		return user.updateAttributes({password: password, passwordResetToken: null, passwordResetTokenExpires: null});
+
+	}).then(function(user){
+    return req.logIn(user, function(err) {
+			req.flash("success", "Password updated");
+			return res.redirect("/");
+    });
+
+	}).catch(function(error) {
+    req.flash('error', 'Password reset token is invalid or has expired.');
+		return res.redirect("/profile/recover");
+	})
+});
+
+
+
+app.post('/profile/delete', function (req, res, next) {
+	if (!req.user)
+		res.redirect("/login")
+
+	return req.user.destroy().then(function(user) {
+		req.flash('success', "Your profile was deleted");
+		req.logout();
+		res.redirect('/');
+	})
+
 })
 
 app.post('/profile/edit', function (req, res, next) {
@@ -598,7 +737,12 @@ app.post('/register', function (req, res, next) {
 		});
 
 	}).catch (function (error) {
-		req.flash("error", "Registration failed.");
+		if(error.name === "SequelizeUniqueConstraintError") {
+			req.flash("error", "The specified details already exist");
+		}else {
+			req.flash("error", "Registration failed");
+		}
+
 		console.error(error);
 		return res.redirect("/register");
 	})
@@ -618,7 +762,7 @@ app.post('/login', passport.authenticate('local', {
 		successRedirect : '/',
 		failureRedirect : '/login',
 		session : true,
-		failureFlash : 'Invalid username or password.'
+		failureFlash : 'Invalid username or password'
 	}));
 
 // Logout the user, then redirect to the home page.
@@ -653,7 +797,7 @@ app.get('/', function (req, res) {
 });
 
 // catch 404 and forward to error handler
-app.use(function (req, res, next) {
+	app.use(function (req, res, next) {
 	var err = new Error('Not Found');
 	err.status = 404;
 	next(err);

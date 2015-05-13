@@ -1,15 +1,15 @@
-Dear <%=locals.fullname%>,<br/><br/>
+Dear <%=locals.user.fullname%>,<br/><br/>
 
 Thank you for signing up with us. <br/>
 Your new account has been setup and you can now login using the details below.<br/><br/>
 
-Username: <%= locals.username %> <br/>
+Username: <%= locals.user.username %> <br/>
 Password: The one you specified during the signup process <br/><br/>
 
-To login, visit <a href="https://traction.owntracks.org/login">https://traction.owntracks.org/login</a> <br/><br/>
+To login, visit <a href="<%=locals.externalUrl%>}/login"><%=locals.externalUrl%>/login</a> <br/><br/>
 
 Kind regards,<br/><br/>
 
-The Traction team<br/>
+The OwnTracks Hosted team<br/>
 Follow us on Twitter: <a href="https://twitter.com/owntracks">https://twitter.com/owntracks</a> <br/>
 Join our community: <a href="https://community.owntracks.org">https://community.owntracks.org</a>

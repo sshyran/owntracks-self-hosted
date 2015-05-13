@@ -32,6 +32,7 @@
     "request": "^2.55.0",
     "request-promise": "^0.4.1",
     "sequelize": "^2.0.5",
+    "sequelize-cli": "^1.7.0",
     "serve-favicon": "~2.2.0",
     "stylus": "0.42.3"
   }

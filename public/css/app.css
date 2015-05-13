@@ -239,6 +239,9 @@ span.deviceUsername {
   user-select: none;
 }
 
+.btn-height {
+  line-height: 35px;
+}
 .btn {
   text-transform: uppercase;
 }

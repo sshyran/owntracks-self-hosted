@@ -40,6 +40,8 @@ module.exports = function (sequelize, DataTypes) {
 						this.setDataValue('password', pbkdf2);
 				}
 			},
+		  passwordResetToken: {type: DataTypes.STRING, allowNull: true, default: null},
+		  passwordResetTokenExpires: {type: DataTypes.DATE, allowNull: true, default: null},
 			disabled : {
 				type : DataTypes.BOOLEAN,
 				defaultValue : false,

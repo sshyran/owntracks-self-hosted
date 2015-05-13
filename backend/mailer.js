@@ -17,24 +17,21 @@ var defaultTransport = nodemailer.createTransport(ses({
 
 module.exports = function(app) {	
 	app.mailer = {};
-	app.mailer.sendTestNotification = function(user, cb) {
-		sendTemplate("test", user.email, "Test", user, cb);
-	}
 
 	app.mailer.sendRegisterNotification = function(user, cb) {
-		sendTemplate("register", user.email, "Welcome to Traction", user, cb);
+		sendTemplate("register", user.email, "Welcome to Traction", {user: user, externalUrl: config.externalUrl}, cb);
 	}
-	app.mailer.sendResetPasswort = function(user, cb) {
-		sendTemplate("todo", user.email, "todo", user, cb);
+	app.mailer.sendPasswordResetLink = function(user, cb) {
+		sendTemplate("passwordReset", user.email, "OwnTracks Hosted Password Reset", {user: user, externalUrl: config.externalUrl}, cb);
 	}
 	app.mailer.sendPasswordChangedNotification = function(user, cb) {
-		sendTemplate("todo", user.email, "todo", user, cb);
+		sendTemplate("passwordChange", user.email, "todo", user, cb);
 	}
 	app.mailer.sendDeviceTokenResetNotification = function(userDevice, cb) {
 		sendTemplate("deviceTokenReset", userDevice.user.email, "todo", userDevice, cb);
 	}
 	app.mailer.sendNewTrackingUserNotification = function(user, cb) {
-		sendTemplate("todo", user.email, "todo", user, cb);
+		sendTemplate("newTrackingUser", user.email, "todo", user, cb);
 	}
 
 

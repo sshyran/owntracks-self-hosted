@@ -2,21 +2,22 @@ extends layout
 extends layout
 
 block body
-  .col-sm-6.col-lg-offset-3
-    .panel.panel-default
-      .panel-heading
-        h4.head Add Tracker
-      form.bs-example.form-horizontal(method='post', action='/trackers/add')
-        .panel-body
-          .form-group
-            .col-lg-12
-              select(class="form-control" name="deviceId")
-                - each device in devices
-                  option(value=device.id)=device.devicename
-          .form-group
-            .col-lg-12
-              input#name.form-control(name='username', placeholder='Username', autofocus, required)
-        .panel-footer
-          button.pull-right.btn.btn-primary(type='submit') Create
-          .clearfix
+  .row
+    .col-sm-6.col-lg-offset-3
+      .panel.panel-default
+        .panel-heading
+          h4.head Add Tracker
+        form.bs-example.form-horizontal(method='post', action='/trackers/add')
+          .panel-body
+            .form-group
+              .col-lg-12
+                select(class="form-control" name="deviceId")
+                  - each device in devices
+                    option(value=device.id)=device.devicename
+            .form-group
+              .col-lg-12
+                input#name.form-control(name='username', placeholder='Username', autofocus, required)
+          .panel-footer
+            button.pull-right.btn.btn-primary(type='submit') Create
+            .clearfix
 

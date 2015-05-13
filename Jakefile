@@ -12,19 +12,13 @@ namespace('traction', function () {
 		console.log(">> running traction:install");
 	})
 
-	task('update', ["db:update"], function () {	  
-		console.log(">> running traction:update");
-
-	})
-
 	namespace('db', function () {
-		task('update', ["migrate"], function () {	  
-			console.log(">> running traction:db:update");
+		task('init', ["sync", "seed"], function () {	  
+			console.log(">> running traction:db:init");
 		})
 
-		task('init', [], function () {	  
-			console.log(">> running traction:db:init");
-			var masterUser;
+		task('sync', [], function () {	  
+			console.log(">> running traction:db:sync");
 			return app.db.connection.sync({force: true}).then(function() {
 				// Create view for mosquitto auth
 				return app.db.connection.query("CREATE OR REPLACE VIEW Auth AS SELECT u.id, u.username, d.devicename, d.accessToken FROM Users AS u JOIN Devices AS d WHERE u.id = d.userId;")
@@ -37,26 +31,27 @@ namespace('traction', function () {
 				// It can safely be dropped as the new index includes all components in the same order to maintain foreign key integrity
 				console.log("Fixing indices of Shares table");
 				return app.db.connection.query("DROP INDEX `Shares_trackedUserId_trackingUserId_unique` on `Shares`");
-			}).then(function() {
-			        	return app.db.models.User.create({
-       					         username : config.broker.user.split("|")[0],
-               					 email : "undefined@example.org",
-               					 password : config.broker.password
-        				})
+			}).catch(function(error) { 
+				console.error("error: " + error); 
+			});
+		});
 
-				}).then(function(user))
+		task('seed', [], function () {	  
+			console.log(">> running traction:db:seed");
+
+			return app.db.models.User.create({
+					username : config.broker.user.split("|")[0],
+					email : "undefined@example.org",
+					password : config.broker.password
+			}).then(function(user) {
 				return app.db.models.Permission.create({
 					username : user.username,
 					topic : "#",
 					rw: "2"
 				})
-			})
-
-
-			.catch(function(error) { 
+			}).catch(function(error) { 
 				console.error("error: " + error); 
 			});
 		})
-
 	})
 })
