@@ -1,6 +1,7 @@
 var crypto = require('crypto');
 var config = require('../config.json')
 var util = require('util')
+var base32 = require('base32')
 
 module.exports = function (sequelize, DataTypes) {
 	var app = sequelize.app; 
@@ -87,7 +88,9 @@ module.exports = function (sequelize, DataTypes) {
 					Device.hasMany(models.Share, {foreignKey: 'trackedDeviceId', onDelete: 'cascade'});
 				},
 				generateToken : function () {
-					var accessToken = crypto.randomBytes(16).toString('base64');
+					var accessToken = base32.encode(crypto.randomBytes(8));
+					
+					
 					var accessTokenHashSalt = crypto.randomBytes(config.passwordOptions.saltLength);
 					var accessTokenHashSaltB64 = accessTokenHashSalt.toString('base64');
 
