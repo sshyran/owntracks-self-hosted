@@ -31,10 +31,11 @@ border-radius: 0;
   border-bottom: 1px solid #3565A6;
   border-right: 1px solid #3565A6;
 }
-.navbar a.navbar-brand:hover {
+.navbar a.navbar-brand:hover,.navbar a.navbar-brand:focus {
   background: #3E76BF; 
   color: #FFF;
 }
+
 
 .navbar a {
   color: #333;
@@ -49,9 +50,62 @@ border-radius: 0;
 }
 
 ul.navbar-right, ul.navbar-right > li {
-  height: 65px; 
+  min-height: 65px; 
 }
 
+
+
+.nav > li > a.dropdown-toggle-collapse{
+	display: none;
+}
+
+@media only screen and (max-width:768px){
+	ul.navbar-right, ul.navbar-right > li {
+		min-height: 0; 
+	}
+    .nav > li > a.dropdown-toggle-collapse{
+        display: block  !important;
+		line-height: 30px !important; 
+		background: #FFF !important;
+		font-size: 17px;
+    }
+	.nav > li > a.dropdown-toggle-nocollapse{
+        display: none;
+    }
+	
+}
+
+
+button.navbar-toggle.navbar-toggle .icon-bar {
+  height: 3px;
+  border-radius: 0px;
+}
+
+.navbar-toggle .icon-bar + .icon-bar {
+  margin-top: 5px;
+}
+
+.navbar-default .navbar-toggle:hover, .navbar-default .navbar-toggle:focus {
+  background-color: #FFF;
+}
+
+button.navbar-toggle {
+margin: 0;
+  border: 0;
+  background: #FFFFFF;
+  border-radius: 0;
+  height: 65px;
+  width: 65px;
+  border-left: 1px solid #E1E1E1;
+}
+.navbar-default .navbar-toggle .icon-bar {
+  background-color: #C0C0C0;
+}
+
+.navbar-default .navbar-toggle .icon-bar {
+  margin-left: auto;
+  margin-right: auto;
+}
 #user {
   height: 64px;
   line-height: 64px;
