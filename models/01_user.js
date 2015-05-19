@@ -1,14 +1,4 @@
-var crypto = require('crypto');
-var config = require('../config.json')
-var util = require('util')
-var request = require('request-promise').defaults({
-		encoding : null
-});
-
 module.exports = function (sequelize, DataTypes) {
-	var app = sequelize.app; 
-
-
 	var User = sequelize.define('User', 
 		{
 			username : {
@@ -40,37 +30,21 @@ module.exports = function (sequelize, DataTypes) {
 						this.setDataValue('password', pbkdf2);
 				}
 			},
-		  passwordResetToken: {type: DataTypes.STRING, allowNull: true, default: null},
-		  passwordResetTokenExpires: {type: DataTypes.DATE, allowNull: true, default: null},
 			disabled : {
 				type : DataTypes.BOOLEAN,
 				defaultValue : false,
 				allowNull : false
 			}
 		}, {
-			hooks: {
-        afterCreate: function(instance, options, fn){
-          //app.statsd.increment("users");
-          app.mailer.sendRegisterNotification(instance, function(error, responseStatusMessage, html, text){
-          	console.log("Registration email send: " + error + " " + responseStatusMessage + " " + text)
-          	fn();
-
-          })
-        },
-        afterDestroy: function(instance, options, fn){
-          //app.statsd.decrement("users");
-          fn();
-        }
-
-      },
+			hooks : {},
 			classMethods : {
-				associate: function(models){
-					User.hasMany(models.Device, {foreignKey: "userId", onDelete: 'cascade'})
+				associate: function(){
+					User.hasMany(models.device)
 
-					User.hasMany(models.User, {as: "trackedUsers", foreignKey: 'trackingUserId', otherKey: "trackedUserId", through: models.Share})
-					User.belongsToMany(models.User, {as: "trackingUsers", foreignKey: 'trackedUserId', otherKey: "trackingUserId", through: models.Share})
-	
-				},
+					User.hasMany(models.Share, {as: 'tracking', foreignKey: 'trackingUserId'});
+					User.belongsTo(models.Share, {as: 'tracked', foreignKey: 'trackedUserId'});
+
+					},
 				findById : function (id) {
 					return User.find(id);
 				},
@@ -119,12 +93,6 @@ module.exports = function (sequelize, DataTypes) {
 					})
 				},
 
-				getTopic: function() {
-					return config.broker.prefix + "/" + this.getUsername();
-				},
-
-
-
 				getUsername : function () {
 					return this.username;
 				},
@@ -172,33 +140,17 @@ module.exports = function (sequelize, DataTypes) {
 					})
 				},
 
-				shareDev: function(device, toUser) {
-					var self = this;
-					return app.db.models.Share.create({trackingUserId: toUser.id, trackedDeviceDevicename: device.devicename,  accepted: false, trackedUserId: this.id, trackedDeviceId: device.id}).then(function(share){
-						return app.db.models.Permission.create({userId: toUser.id, username: toUser.username, deviceId: device.id, shareId: share.id, topic: device.getROTopic(self), rw: "1"});
-					});
-				},
-
 				addDev : function (name) {
-					var token = app.db.models.Device.generateToken();
 					var self = this;
-					var newDevice; 
-
-					return app.db.models.Device.create({
+					var token = Device.generateToken();
+					return Device.create({
 						devicename : name,
-						userId : self.id,
+						UserId : self.id,
 						accessToken : token.pbkdf2
 					}).then(function (device) {
-						newDevice = device; 
-						newDevice.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
-
-						return app.db.models.Permission.create({userId: self.id, username: self.username, deviceId: newDevice.id, shareId: null, topic: newDevice.getRWTopic(self), rw: "2"});
-
-
-					}).then(function () {
-						newDevice.updateFace(self);
-						return newDevice;
-					});
+						device.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
+						return device;
+					})
 				},
 			}
 		}

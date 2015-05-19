@@ -30,9 +30,11 @@ app.use(session({
 		store : new RedisStore({
 			host : config.redis.host,
 			port : config.redis.port,
-			prefix : config.redis.prefix
+			prefix : config.redis.prefix,
 		}),
 		secret : config.session.secret,
+		resave: true, 
+		saveUninitialized: false
 	}));
 app.use(flash());
 app.use(function (req, res, next) {
@@ -50,7 +52,7 @@ require('./backend/statsd.js')(app);
 require('./backend/mailer.js')(app);
 
 
-app.statsd.increment('startups')
+//app.statsd.increment('startups')
 
 // Check supported crypto hashes
 debug("Supported hashes: " + crypto.getHashes());
@@ -89,16 +91,16 @@ passport.use(new LocalStrategy(
 	function (username, password, done) {
 		return app.db.models.User.findByUsername(username).then(function (user) {
 			if (!user) {
-				app.statsd.increment("logins-failed");
+				//app.statsd.increment("logins-failed");
 				return done(null, false, {
 					message : 'Unknown user ' + username
 				});
 			}
-			app.statsd.increment("logins-success");
+			//app.statsd.increment("logins-success");
 
 			return user.authenticate(password, done);
 		}).catch (function (error) {
-			app.statds.increment("logins-failed");
+			//app.statds.increment("logins-failed");
 			return done(error);
 		});
 	}
@@ -164,7 +166,9 @@ app.post('/devices/add', function (req, res) {
 
 	console.log("creating device: " + devicename);
 
-	return req.user.addDev(devicename).then(function (device) {
+	app.db.connection.transaction(function (t) {
+		return req.user.addDev(devicename) 
+	}).then(function (device) {
 		req.session.plainAccessToken = device.plainAccessToken;
 		device.plainAccessToken = undefined;
 		req.flash("success", "Device added");
@@ -177,7 +181,6 @@ app.post('/devices/add', function (req, res) {
 			req.flash("error", "The device could not be created");s
 		}
 		return res.redirect('/devices/add');
-
 	})
 })
 
@@ -185,72 +188,79 @@ app.post('/devices/:id/delete', function (req, res) {
 	if (!req.user)
 		res.redirect("/login")
 
-		app.db.models.Device.find(req.params.id).then(function (device) {
-			if (!device || device.userId !== req.user.id) {
-				req.flash("error", "Deleting the device failed.");
-				return res.redirect("/");
-			}
+	app.db.connection.transaction(function (t) {
 
+		return app.db.models.Device.findOne(req.params.id).then(function (device) {
+			if (!device || device.userId !== req.user.id) {
+				throw new Error("The object could not be found");
+			}
+			
 			device.clearFace(req.user);
 			return device.destroy();
-		}).then(function (device) {
-			//return app.db.models.Permission.destroy({where: {deviceId: device.id}})
-		}).then(function() {
-			req.flash("success", "Device deleted.");
-			return res.redirect('/');
-		}).catch (function (error) {
-			req.flash("error", "Deleting the device failed with error: " + error);
-			return res.redirect("/")
 		})
+	}).then(function() {
+		req.flash("success", "Device deleted.");
+		return res.redirect('/');
+	}).catch (function (error) {
+		req.flash("error", error.toString().replace("Error: ", ""));
+		return res.redirect("/")
+	})
 })
 
 app.post('/devices/:id/reset', function (req, res) {
 	if (!req.user)
 		res.redirect("/login")
 
-		app.db.models.Device.find(req.params.id).then(function (device) {
-			if (!device || device.userId !== req.user.id) {
-				req.flash("error", "Resetting the device credentials failed.");
-				return res.redirect("/")
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.Device.findOne({where: {id: req.params.id, userId: req.user.id}}).then(function (device) {
+			if (!device) {
+				throw new Error("The object could not be found");
 			}
 
 			return device.resetToken();
-		}).then(function (device) {
-			req.session.plainAccessToken = device.plainAccessToken;
-			device.plainAccessToken = undefined;
-			req.flash("success", "New device cretentials generated.");
-			app.mailer.sendDeviceTokenResetNotification({user: req.user, device: device}, function(error, responseStatusMessage, html, text){});
-
-			return res.redirect('/devices/' + device.id);
-		}).catch (function (error) {
-			console.error(error);
-			res.redirect("/")
 		})
+	}).then(function (device) {
+		req.session.plainAccessToken = device.plainAccessToken;
+		device.plainAccessToken = undefined;
+		req.flash("success", "New device cretentials generated.");
+		app.mailer.sendDeviceTokenResetNotification({user: req.user, device: device}, function(error, responseStatusMessage, html, text){});
+
+		return res.redirect('/devices/' + device.id);
+	}).catch (function (error) {
+		req.flash("error", error.toString().replace("Error: ", ""));
+		return res.redirect("/")
+	})
 })
 
 app.get('/devices/:id', function (req, res) {
 	if (!req.user)
 		return res.redirect("/login")
 
-		app.db.models.Device.find(req.params.id).then(function (device) {
-			if (!device || device.userId !== req.user.id) {
-				req.flash("error", "Access denied");
-				return res.redirect("/")
-			}
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.Device.findOne({where: {id: req.params.id, userId: req.user.id}})
+	}).then(function (device) {
+		if (!device) {
+			throw new Error("The object could not be found");
+		}
 
-			var accessToken = req.session.plainAccessToken;
-			var firstStart = req.session.firstStart;
+		var accessToken = req.session.plainAccessToken;
+		var firstStart = req.session.firstStart;
 
-			// Clean up session
-			req.session.firstStart = undefined
-				req.session.plainAccessToken = undefined;
-			res.render('device', {
-				device : device,
-				user : req.user,
-				accessToken : accessToken,
-				firstStart : firstStart != undefined
-			});
-		})
+		// Clean up session
+		req.session.firstStart = undefined
+		req.session.plainAccessToken = undefined;
+		
+		res.render('device', {
+			device : device,
+			user : req.user,
+			accessToken : accessToken,
+			firstStart : firstStart != undefined
+		});
+	}).catch (function (error) {
+		req.flash("error", error.toString().replace("Error: ", ""));
+		return res.redirect("/")
+	});
+	
 })
 
 
@@ -258,10 +268,11 @@ app.get('/trackers/add', function (req, res) {
 	if (!req.user)
 		return res.redirect("/login")
 
-	req.user.getDevices().then(function (devices) {
+	return app.db.connection.transaction(function (t) {
+		return req.user.getDevices();
+	}).then(function (devices) {
 		if (devices.length == 0) {
-			req.flash("error", "Please add a device first");
-			return res.redirect("/")
+			throw new Error("Please add a device first");
 		}
 
 		return res.render('tracker-add', {
@@ -269,6 +280,9 @@ app.get('/trackers/add', function (req, res) {
 			devices: devices
 		});
 
+	}).catch (function (error) {
+		req.flash("error", error.toString().replace("Error: ", ""));
+		return res.redirect("/")
 	})
 })
 
@@ -283,19 +297,22 @@ app.post('/tracking/:id/accept', function (req, res) {
 
 	var trackedUser; 
 	var share; 
-	return app.db.models.Share.find(req.params.id).then(function(s){
-		share = s; 
+	
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.Share.findOne({where: {id: req.params.id, trackingUserId: req.user.id}}).then(function(s){
+			share = s; 
 
-		if (!share || share.trackingUserId !== req.user.id) {
-			throw new Error("Access denied");
-		}
+			if (!share) {
+				throw new Error("The object could not be found");
+			}
 
-		return share.updateAttributes({accepted: true});
+			return share.updateAttributes({accepted: true});
+		})
 	}).then(function(){
 		req.flash("success", "Tracking accepted");
 		return res.redirect("/tracking/"+share.id);
 	}).catch(function(error){
-		req.flash("error", error.toString());
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/");
 	});
 })
@@ -310,21 +327,23 @@ app.post('/tracking/:id/delete', function (req, res) {
 
 	var trackedUser; 
 	var share; 
-	return app.db.models.Share.find(req.params.id).then(function(s){
-		share = s; 
+	
+	return app.db.connection.transaction(function (t) {
 
-		if (!share || share.trackingUserId !== req.user.id) {
-			throw new Error("Access denied");
-		}
+		return app.db.models.Share.find(req.params.id).then(function(s){
+			share = s; 
 
-		return share.destroy();
-	}).then(function(share){
-                //return app.db.models.Permission.destroy({where: {shareId: share.id}})
+			if (!share || share.trackingUserId !== req.user.id) {
+				throw new Error("The object could not be found");
+			}
+
+			return share.destroy();
+		})
 	}).then(function(){
 		req.flash("success", "Tracking removed");
 		return res.redirect("/");
 	}).catch(function(error){
-		req.flash("error", error.toString());
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/");
 	});
 })
@@ -335,16 +354,19 @@ app.get('/tracking/:id', function (req, res) {
 		return res.redirect("/login")
 
 	var share; 
-	return app.db.models.Share.find(req.params.id).then(function(s){
+	
+	return app.db.connection.transaction(function (t) {
+
+		return app.db.models.Share.findOne({where: {id: req.params.id, trackingUserId: req.user.id}}).then(function(s){
 			share = s; 
-
-
-			if (!share || share.trackingUserId !== req.user.id) {
-				throw new Error("Access denied");
+			
+			if (!share) {
+				throw new Error("The object could not be found");
 			}
 
 			return app.db.models.User.find(share.trackedUserId);
-		}).then(function(trackedUser){
+		})
+	}).then(function(trackedUser){
 
 			return res.render('tracking', {
 				user : req.user, 
@@ -352,9 +374,8 @@ app.get('/tracking/:id', function (req, res) {
 				share: share
 			});
 
-
 		}).catch(function(error){
-			req.flash("error", error.toString());
+			req.flash("error", error.toString().replace("Error: ", ""));
 			return res.redirect("/");
 		});
 
@@ -366,14 +387,16 @@ app.get('/trackers/:id', function (req, res) {
 		return res.redirect("/login")
 
 	var share; 
-	return app.db.models.Share.find(req.params.id).then(function(s){
-		share = s; 
-		if (!share || share.trackedUserId !== req.user.id) {
-			throw new Error("Access denied");
-		}
-			
-
-		return app.db.models.User.find(share.trackingUserId);
+	
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.Share.findOne({where: {id: req.params.id, trackedUserId: req.user.id}}).then(function(s){
+			share = s; 
+			if (!share ) {
+				throw new Error("The object could not be found");
+			}
+				
+			return app.db.models.User.find(share.trackingUserId);
+		})
 	}).then(function(trackingUser){
 		return res.render('tracker', {
 			user : req.user, 
@@ -381,9 +404,8 @@ app.get('/trackers/:id', function (req, res) {
 			share: share
 		});
 
-
 	}).catch(function(error){
-		req.flash("error", error.toString());
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/");
 	});
 
@@ -399,21 +421,24 @@ app.post('/tracker/:id/delete', function (req, res) {
 
 	var trackedUser; 
 	var share; 
-	return app.db.models.Share.find(req.params.id).then(function(s){
-		share = s; 
+	
+	return app.db.connection.transaction(function (t) {
 
-		if (!share || share.trackedUserId !== req.user.id) {
-			throw new Error("Access denied");
-		}
+		return app.db.models.Share.find({where: {id: req.params.id, trackedUserId: req.user.id}}).then(function(s){
+			share = s; 
 
-		return share.destroy();
-	}).then(function(share){
-		//return app.db.models.Permission.destroy({where: {shareId: share.id}})
+			if (!share) {
+				throw new Error("The object could not be found");
+			}
+
+			return share.destroy();
+		});
+		
 	}).then(function(){
 		req.flash("success", "Tracker removed");
 		return res.redirect("/");
 	}).catch(function(error){
-		req.flash("error", error.toString());
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/");
 	});
 })
@@ -441,31 +466,33 @@ app.post('/trackers/add', function (req, res) {
 	var targetUser; 
 
 
+	return app.db.connection.transaction(function (t) {
 
-	return app.db.models.Device.find(deviceId).then(function (d) {
-		device = d;
+		return app.db.models.Device.findOne({where: {id: deviceId, userId: req.user.id}}).then(function (d) {
+			device = d;
 
-		if (!device || device.userId !== req.user.id) {
-			throw new Error("Access denied");
-		}
+			if (!device) {
+				throw new Error("The object could not be found");
+			}
 
 
-		return app.db.models.User.findOne({where: {username: username}});
+			return app.db.models.User.findOne({where: {username: username}});
 
-	}).then(function(t){
-		targetUser = t;
+		}).then(function(t){
+			targetUser = t;
 
-		if(!targetUser) {
-			throw new Error("The specified user does not exist");
-		}
+			if(!targetUser) {
+				throw new Error("The specified user does not exist");
+			}
 
-		return app.db.models.Share.find({where: {trackedUserId: req.user.id, trackingUserId: targetUser.id, trackedDeviceId: device.id}})
-	}).then(function(share){
-		if(share) {
-			throw new Error("This device is already tracked by " + targetUser.username);
-		}
+			return app.db.models.Share.find({where: {trackedUserId: req.user.id, trackingUserId: targetUser.id, trackedDeviceId: device.id}})
+		}).then(function(share){
+			if(share) {
+				throw new Error("This device is already tracked by " + targetUser.username);
+			}
 
-		return req.user.shareDev(device, targetUser);
+			return req.user.shareDev(device, targetUser);
+		})
 	}).then(function(){
 		req.flash("success", "The user has been invited to track your device");
 		return res.redirect("/");
@@ -513,37 +540,33 @@ app.post('/profile/recover', function (req, res) {
 		res.redirect('/');
 	}
 
-	return app.db.models.User.findOne({where: {email: email}}).then(function (user){
-		if(!user) {
-			throw "not-found"
-		}
+	return app.db.connection.transaction(function (t) {
 
-    var tokenRaw = crypto.randomBytes(20);
-    var token = tokenRaw.toString('hex');
+		return app.db.models.User.findOne({where: {email: email}}).then(function (user){
+			if(!user) {
+				throw new Error("We send you a recovery link"); // Don't give away that the user was not found
+			}
 
-    var expires = new Date();
-    expires.setTime(expires.getTime()+3600000);
+			var tokenRaw = crypto.randomBytes(20);
+			var token = tokenRaw.toString('hex');
 
-    return user.updateAttributes({passwordResetToken: token, passwordResetTokenExpires: expires});
+			var expires = new Date();
+			expires.setTime(expires.getTime()+3600000);
 
+			return user.updateAttributes({passwordResetToken: token, passwordResetTokenExpires: expires});
 
+		})
 	}).then(function(user) {
 		app.mailer.sendPasswordResetLink(user, function(){});
 		req.flash('success', "We send you a recovery link");
 		res.redirect('/profile/recover');
-
 	}).catch(function(error) {
 		console.error(error);
-
-		if(error == "not-found") {
-			// Don't give away that the user was not found
-			req.flash('success', "We send you a recovery link");
-			res.redirect('/profile/recover');
-
-		}
+		req.flash("success", error.toString().replace("Error: ", "")); // Don't give away errors here
+		res.redirect('/profile/recover');
 	})
-
 })
+
 app.get('/profile/reset/:token', function (req, res) {
 	// Not for logged in users
 	if (req.user)
@@ -554,20 +577,20 @@ app.get('/profile/reset/:token', function (req, res) {
 		return res.redirect("/profile/recover");
 	}
 
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.User.findOne({where: {passwordResetToken: req.params.token, passwordResetTokenExpires: {gt: new Date()}}}).then(function(user) {
+			if(!user) {
+				throw new Error("Password reset token is invalid or has expired");
+			}
 
-	return app.db.models.User.findOne({where: {passwordResetToken: req.params.token, passwordResetTokenExpires: {gt: new Date()}}}).then(function(user) {
-		if(!user) {
-			throw "not-found-or-expired";
-		}
-
-		return res.render('profile-reset', {
-			user: user,
-			token: req.params.token
-		});
-
+			return res.render('profile-reset', {
+				user: user,
+				token: req.params.token
+			});
+		})
 	}).catch(function(error) {
 		console.error(error);
-    req.flash('error', 'Password reset token is invalid or has expired.');
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/profile/recover");
 	})
 });
@@ -595,21 +618,23 @@ app.post('/profile/reset/:token', function (req, res) {
 		return res.redirect("/profile/reset/"+req.params.token);
 	}
 
-	return app.db.models.User.findOne({where: {passwordResetToken: req.params.token, passwordResetTokenExpires: {gt: Date.now()}}}).then(function(user) {
-		if(!user) {
-			throw "not-found-or-expired";
-		}
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.User.findOne({where: {passwordResetToken: req.params.token, passwordResetTokenExpires: {gt: Date.now()}}}).then(function(user) {
+			if(!user) {
+				throw new Error("Password reset token is invalid or has expired");
+			}
 
-		return user.updateAttributes({password: password, passwordResetToken: null, passwordResetTokenExpires: null});
+			return user.updateAttributes({password: password, passwordResetToken: null, passwordResetTokenExpires: null});
 
+		})
 	}).then(function(user){
-    return req.logIn(user, function(err) {
+		return req.logIn(user, function(err) {
 			req.flash("success", "Password updated");
 			return res.redirect("/");
-    });
+		});
 
 	}).catch(function(error) {
-    req.flash('error', 'Password reset token is invalid or has expired.');
+		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/profile/recover");
 	})
 });
@@ -620,12 +645,16 @@ app.post('/profile/delete', function (req, res, next) {
 	if (!req.user)
 		res.redirect("/login")
 
-	return req.user.destroy().then(function(user) {
+	return app.db.connection.transaction(function (t) {
+		return req.user.destroy()
+	}).then(function(user) {
 		req.flash('success', "Your profile was deleted");
 		req.logout();
 		res.redirect('/');
+	}).catch(function(error) {
+		req.flash("error", error.toString().replace("Error: ", ""));
+		return res.redirect("/profile");
 	})
-
 })
 
 app.post('/profile/edit', function (req, res, next) {
@@ -665,14 +694,16 @@ app.post('/profile/edit', function (req, res, next) {
 		if (newPassword)
 			update['password'] = newPassword
 
-		return user.updateAttributes(update).then(function(user){
+			
+		return app.db.connection.transaction(function (t) {	
+			return user.updateAttributes(update)
+		}).then(function(user){
 			return user.updateDeviceFaces();
 		}).then(function () {
 			req.flash("success", "Profile updated.");
 			return res.redirect('/profile');
 		}).catch (function (error) {
-
-			req.flash("error", "Profile update failed: " + error);
+			req.flash("error", error.toString().replace("Error: ", ""));
 			return res.redirect('/profile/edit');
 		})
 	})
@@ -707,21 +738,21 @@ app.post('/register', function (req, res, next) {
 	var user;
 	var device; 
 
-
-	return app.db.models.User.create({
-		username : username,
-		email : email,
-		password : password,
-		fullname: fullname
-	}).then(function (u) {
-		user = u;
-		return user.updateFace();
-	}).then(function (user) {
-		return user.addDev(devicename)
-	}).then(function (d) {
+	return app.db.connection.transaction(function (t) {
+		return app.db.models.User.create({
+			username : username,
+			email : email,
+			password : password,
+			fullname: fullname
+		}).then(function (u) {
+			user = u;
+			return user.updateFace();
+		}).then(function (user) {
+			return user.addDev(devicename)
+		})
+	}).then(function(d){
 		device = d; 
 
-		console.log("device access token: " + device.plainAccessToken);
 		return req.logIn(user, function (err) {
 			if (err) {
 				console.log(err);
@@ -730,23 +761,19 @@ app.post('/register', function (req, res, next) {
 
 			req.session.plainAccessToken = device.plainAccessToken;
 			device.plainAccessToken = undefined;
-
 			req.session.firstStart = true;
 
 			return res.redirect('/devices/' + device.id);
 		});
-
 	}).catch (function (error) {
-		if(error.name === "SequelizeUniqueConstraintError") {
-			req.flash("error", "The specified details already exist");
-		}else {
-			req.flash("error", "Registration failed");
-		}
+			if(error.name === "SequelizeUniqueConstraintError") {
+				req.flash("error", "The specified details already exist");
+			}else {
+				req.flash("error", error.toString().replace("Error: ", ""));
+			}
 
-		console.error(error);
-		return res.redirect("/register");
-	})
-
+			return res.redirect("/register");
+	});
 });
 
 // Render the login page.
@@ -778,29 +805,34 @@ app.get('/', function (req, res) {
 	var trackedUsers;
 	var trackingUsers;
 
-	req.user.getTrackedUsers({include: [app.db.models.Device]}).then(function(t){
-		trackedUsers = t; 
-		return req.user.getTrackingUsers();
-	}).then(function(t){
-		trackingUsers = t; 
-		return req.user.getDevices();
-	}).then(function (devices) {
+	return app.db.connection.transaction(function (t) {
 
+		return req.user.getTrackedUsers({include: [app.db.models.Device]}).then(function(t){
+			trackedUsers = t; 
+			return req.user.getTrackingUsers();
+		}).then(function(t){
+			trackingUsers = t; 
+			return req.user.getDevices();
+		})
+	}).then(function (devices) {
 		res.render('dashboard', {
 			user : req.user,
 			devices : devices,
 			trackingUsers: trackingUsers,
-			trackedUsers: trackedUsers
-			
+			trackedUsers: trackedUsers			
 		});
 	});
 });
 
 // catch 404 and forward to error handler
-	app.use(function (req, res, next) {
-	var err = new Error('Not Found');
-	err.status = 404;
-	next(err);
+app.use(function (req, res, next) {
+
+
+	res.status(404)
+
+	res.render('404', {
+		user : req.user,
+	});		
 });
 
 // error handlers

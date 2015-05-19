@@ -21,13 +21,25 @@ module.exports = function (sequelize, DataTypes) {
 		}, {			 
 			hooks: {
 				afterCreate: function(instance, options, fn){
-					app.statsd.increment("devices");
-					fn();
+					//app.statsd.increment("devices");
+					return instance.getUser().then(function(user){
+					
+						if(user)
+							instance.updateFace(user);
+					}).finally(function(error){
+						fn();
+					})
 				},
 				afterDestroy: function(instance, options, fn){
-                                        app.statsd.decrement("devices");
-					fn();
-                                }
+					//app.statsd.decrement("devices");
+					return instance.getUser().then(function(user){
+						console.log("user for update: " + user); 
+						if(user)
+							instance.clearFace(user);
+					}).finally(function(){
+						fn();
+					})
+				}
 
 			},	
 			instanceMethods : {
@@ -59,6 +71,7 @@ module.exports = function (sequelize, DataTypes) {
 				},
 
 				clearFace : function (user) {
+					console.log("clearing face"); 
 					return app.broker.connection.publish(this.getFaceTopic(user), "", {
 						qos : 0,
 						retain : true
@@ -83,6 +96,7 @@ module.exports = function (sequelize, DataTypes) {
 
 			},
 			classMethods : {
+
 				associate: function(models){
 					Device.belongsTo(models.User, {foreignKey: "userId"});
 					Device.hasMany(models.Share, {foreignKey: 'trackedDeviceId', onDelete: 'cascade'});

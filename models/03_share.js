@@ -21,11 +21,11 @@ module.exports = function (sequelize, DataTypes) {
 		}, {
 		hooks: {
                                 afterCreate: function(instance, options, fn){
-                                        app.statsd.increment("shares");
+                                        //app.statsd.increment("shares");
                                         fn();
                                 },
                                 afterDestroy: function(instance, options, fn){
-                                        app.statsd.decrement("shares");
+                                        //app.statsd.decrement("shares");
                                         fn();
                                 }
 

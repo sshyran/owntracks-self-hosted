@@ -1,11 +1,12 @@
 var Sequelize = require('sequelize');
+var cls = require('continuation-local-storage'); // For automatic transactions (see http://docs.sequelizejs.com/en/latest/docs/transactions/) 
+Sequelize.cls = cls.createNamespace('sequelize-transaction-namespace');
+
 var config = require('../config.json'); 
 var lodash = require('lodash');
 var debug = require('debug')('traction:db');
 var fs = require('fs');
 var path = require('path');
-
-
 
 
 
