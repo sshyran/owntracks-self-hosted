@@ -46,20 +46,36 @@ module.exports = function (sequelize, DataTypes) {
 				type : DataTypes.BOOLEAN,
 				defaultValue : false,
 				allowNull : false
+			}, 
+			githubId: {
+				type: DataTypes.STRING, 
+				allowNull :true, 
+				unique: true
+			}, 
+			googleId: {
+				type: DataTypes.STRING,
+				allowNull :true,
+				unique: true
+			}, 
+			twitterId: {
+				type: DataTypes.STRING,
+				allowNull :true,
+				unique: true
 			}
 		}, {
 			hooks: {
         afterCreate: function(instance, options, fn){
           //app.statsd.increment("users");
           app.mailer.sendRegisterNotification(instance, function(error, responseStatusMessage, html, text){
-          	console.log("Registration email send: " + error + " " + responseStatusMessage + " " + text)
-          	fn();
-
-          })
+          	return instance.updateFace().then(function(){
+          		fn();
+          	}); 
+          });
         },
         afterDestroy: function(instance, options, fn){
-          //app.statsd.decrement("users");
-          fn();
+					return instance.clearDeviceFaces(function(){
+        		fn();
+					})
         }
 
       },
@@ -140,19 +156,14 @@ module.exports = function (sequelize, DataTypes) {
 					//  0                    1                          2                       3        4
 					var hashRaw = crypto.pbkdf2Sync(password, pbkdf2[3], parseInt(pbkdf2[2]), config.passwordOptions.keyLength);
 					if (!hashRaw)
-						return done(err);
+						return done(new Error("Password is incorrect"), false);
 
 					console.log("cmp : " + new Buffer(hashRaw, 'binary').toString('base64'));
 
 					if (new Buffer(hashRaw, 'binary').toString('base64') === pbkdf2[4]) {
-						console.log("match");
 						return done(null, this);
 					} else {
-						console.log("no match");
-
-						return done(null, false, {
-							message : 'Password is incorrect'
-						});
+						return done(new Error("Password is incorrect"), false);
 					}
 				},
 				resolveGravatar : function () {
@@ -189,16 +200,18 @@ module.exports = function (sequelize, DataTypes) {
 						userId : self.id,
 						accessToken : token.pbkdf2
 					}).then(function (device) {
+
+						token.deviceId= device.id;
+                                                token.userId =device.userId;
+                                                device.token = token; // Token is temporarily stored in the instance so it can be shown to the user once or downloaded. Contains pbkdf2, plain userId and deviceId. The plain token is never stored in the database^M
 						newDevice = device; 
-						newDevice.plainAccessToken = token.plain; // Token is temporarily stored in the instance so it can be shown to the user once
 
 						return app.db.models.Permission.create({userId: self.id, username: self.username, deviceId: newDevice.id, shareId: null, topic: newDevice.getRWTopic(self), rw: "2"});
 
 
-					}).then(function () {
-						newDevice.updateFace(self);
-						return newDevice;
-					});
+					}).then(function(){
+						return newDevice; 
+					})
 				},
 			}
 		}

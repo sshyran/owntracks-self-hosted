@@ -1,10 +1,10 @@
 extends layout
 
 block flash 
-  - var flash = 4; 
+  - var flashClass = "col-xs-12 col-sm-6 col-sm-offset-3"; 
 block body
   .row
-    .col-xs-12.col-sm-6.col-sm-offset-3
+    .col-xs-12.col-sm-4.col-sm-offset-2
       .panel.panel-default#login
         .panel-heading
           h4 Login
@@ -29,3 +29,10 @@ block body
             a(href="/register" class="btn btn-white pull-right") Register
             .clearfix
 
+    .col-xs-12.col-sm-4
+      .panel.panel-default#login
+        .panel-heading
+          h4 Alternative Logins
+        .panel-body
+          a(href="/login/github") Login with Github
+    

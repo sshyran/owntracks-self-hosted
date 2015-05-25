@@ -1,7 +1,7 @@
 extends layout
 
-block flash 
-  - var flash = 6
+block flash
+  - var flashClass = "col-xs-12 col-sm-6 col-sm-offset-3";
 
 block body
   .row
@@ -17,14 +17,14 @@ block body
             dd= device.devicename
 
             dt Token
-            - if(accessToken)
+            - if(deviceToken)
               dd
-                span.accessTokenPlain= accessToken 
+                span.accessTokenPlain= deviceToken.plain
             -else
               dd 
                 span.accessTokenLocked.glyphicon.glyphicon-lock
           hr.full
-          - if(accessToken) 
+          - if(deviceToken) 
             p.accessTokenPlain
               | This is the last time these device credentials will be available for download. 
               br
@@ -43,7 +43,11 @@ block body
         .panel-footer
           form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/delete')
             button.pull-left.btn.btn-danger(type='submit', value="delete") Delete
-          form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/reset')
+          form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/credentials/reset')
             button.pull-left.btn.btn-white(type='submit', value="delete") Reset credentials    
+          - if(deviceToken)
+            form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/credentials/send')
+              button.pull-right.btn.btn-white(type='submit', value="delete") Mail
+            a.pull-right.btn.btn-white(href="/devices/#{device.id}/credentials/download") Download
           .clearfix
 

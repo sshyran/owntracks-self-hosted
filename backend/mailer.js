@@ -19,23 +19,29 @@ module.exports = function(app) {
 	app.mailer = {};
 
 	app.mailer.sendRegisterNotification = function(user, cb) {
-		sendTemplate("register", user.email, "Welcome to Traction", {user: user, externalUrl: config.externalUrl}, cb);
+		sendTemplate("register", user.email, "Welcome", user, cb);
 	}
 	app.mailer.sendPasswordResetLink = function(user, cb) {
-		sendTemplate("passwordReset", user.email, "OwnTracks Hosted Password Reset", {user: user, externalUrl: config.externalUrl}, cb);
+		sendTemplate("passwordReset", user.email, "Password reset", user, cb);
 	}
 	app.mailer.sendPasswordChangedNotification = function(user, cb) {
-		sendTemplate("passwordChange", user.email, "todo", user, cb);
+		sendTemplate("passwordChanged", user.email, "Password changed", user, cb);
 	}
-	app.mailer.sendDeviceTokenResetNotification = function(userDevice, cb) {
-		sendTemplate("deviceTokenReset", userDevice.user.email, "todo", userDevice, cb);
+	app.mailer.sendDeviceToken = function(userDevice, cb) {
+		sendTemplate("deviceToken", userDevice.user.email, "Device credentials", userDevice, cb, {
+			filename: userDevice.user.username+"-"+userDevice.device.devicename+".otrc", 
+			content: JSON.stringify(userDevice.payload), 
+			contentType: "application/json", 
+			encoding: "utf8",
+			contentDisposition: "attachment; filename=" + userDevice.user.username+"-"+userDevice.device.devicename+".otrc"
+		});
 	}
 	app.mailer.sendNewTrackingUserNotification = function(user, cb) {
-		sendTemplate("newTrackingUser", user.email, "todo", user, cb);
+		sendTemplate("newTracker", user.email, "New tracker", user, cb);
 	}
 
 
-	var sendTemplate = function (templateName, to, subject, locals, fn) {
+	var sendTemplate = function (templateName, to, subject, locals, fn, attachment) {
 		console.log("sending mail " +templateName + " to: " + to);
 		// make sure that we have an user email
 		if (!to) {
@@ -45,7 +51,6 @@ module.exports = function(app) {
 		if (!subject) {
 			return fn(EmailAddressRequiredError);
 		}
-		console.log(templatesDir);
 		emailTemplates(templatesDir, function (err, template) {
 			if (err) {
 				//console.log(err);
@@ -54,10 +59,7 @@ module.exports = function(app) {
 
 
 			// Send a single email
-			template(templateName, locals, function (err, html, text) {
-				console.log("text: " + text);
-								console.log("html: " + html);
-
+			template(templateName, {config: config, data: locals}, function (err, html, text) {
 				if (err) {
 					//console.log(err);
 					return fn(err);
@@ -67,14 +69,16 @@ module.exports = function(app) {
 				transport.sendMail({
 					from: config.mailer.from,
 					to: to,
-					subject: subject,
-					html: html
+					subject: "[OwnTracks Hosted] " + subject,
+					html: html,
+					attachments: attachment ? [attachment] : undefined
 				}, function (err, responseStatus) {
 					if (err) {
 						app.statsd.increment("sent-mails-failed")
 						return fn(err);
 					}
 						app.statsd.increment("sent-mails-success")
+					if(fn)
 						return fn(null, responseStatus.message, html, text);
 				});
 			});

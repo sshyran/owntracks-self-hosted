@@ -21,6 +21,10 @@ border-bottom: 1px solid #E1E1E1;
 border-radius: 0; 
 }
 
+fieldset .form-group:last-child {
+  margin-bottom: 0;
+}
+
 .navbar a.navbar-brand {
   height: 65px; 
   padding: 0 15px; 

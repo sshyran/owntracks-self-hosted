@@ -10,12 +10,16 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
+var GithubStrategy = require('passport-github2').Strategy;
+var TwitterStrategy = require('passport-twitter').Strategy;
+var GoogleStrategy = require( 'passport-google-oauth2' ).Strategy;
 var crypto = require('crypto');
 var session = require('express-session');
 var RedisStore = require('connect-redis')(session);
 var flash = require('connect-flash');
 var mqtt = require('mqtt');
 var util = require('util');
+var _ =require('underscore');
 
 var app = express();
 app.set('views', path.join(__dirname, 'views'));
@@ -37,13 +41,6 @@ app.use(session({
 		saveUninitialized: false
 	}));
 app.use(flash());
-app.use(function (req, res, next) {
-	res.locals.flash_success = req.flash('success');
-	res.locals.flash_error = req.flash('error');
-	next();
-});
-
-
 
 
 require('./backend/db.js')(app);
@@ -91,20 +88,113 @@ passport.use(new LocalStrategy(
 	function (username, password, done) {
 		return app.db.models.User.findByUsername(username).then(function (user) {
 			if (!user) {
-				//app.statsd.increment("logins-failed");
-				return done(null, false, {
-					message : 'Unknown user ' + username
-				});
+				return done(new Error("User not found"), false);
 			}
-			//app.statsd.increment("logins-success");
-
 			return user.authenticate(password, done);
 		}).catch (function (error) {
-			//app.statds.increment("logins-failed");
-			return done(error);
+			return done(error, false);
 		});
 	}
 ));
+
+var profileAttributesFromGithub = function(user, profile) {
+		var attributes = {}; 
+		if(!user || !user.username)	
+			attributes['username'] = profile.username.replace(/[^A-Za-z0-9]/gi, ''); 	
+		if(!user || !user.email)	
+			attributes['email'] = profile.emails[0].value;
+		if(!user || !user.displayName)	
+			attributes['fullname'] = profile.displayName;
+
+		return attributes; 
+}
+
+var profileAttributesFromGoogle = function(user, profile) {
+		var attributes = {}; 
+		if((!user || !user.email) && profile.emails[0].value)	
+			attributes['email'] = profile.emails[0].value;
+		if(!user || !user.displayName)	
+			attributes['fullname'] = profile.displayName;
+
+		return attributes; 
+}
+passport.use(new GithubStrategy({
+    clientID: config.auth.github.clientId,
+    clientSecret: config.auth.github.clientSecret,
+    callbackURL: config.externalUrl+"/login/github/callback",
+    passReqToCallback : true
+  },
+  function(req, accessToken, refreshToken, profile, done) {
+		if(!req.user) { // Use is not logged in, check if we can login user
+			return app.db.models.User.findOne({where: {githubId: profile.id}}).then(function(user){
+				var attributes = profileAttributesFromGithub(user, profile);
+				console.log("attributes for create or update");
+				console.log(attributes);
+
+				if(!user) // Create new user from Github profile
+					return app.db.models.User.create(_.extend({githubId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes));
+
+
+				// Update attribute of user if needed
+				return _.isEmpty(attributes) ? user : user.updateAttributes(attributes);
+				
+			}).then(function(user){
+				return done(null, user); 
+			}).catch(function(error){
+				console.log("new account account from github failed");
+				console.log(error);
+				return done(new Error("already exist"), false)
+			});
+		} else { // User is already logged in, link account
+			return req.user.updateAttributes(_.extend({githubId: profile.id}, profileAttributesFromGithub(req.user, profile))).then(function(user){
+				return done(null, user)
+			}).catch(function(error){
+				console.log("linking account to github failed");
+				console.log(error);
+				return done(error, false)
+			});;
+		}
+	}
+));
+
+
+passport.use(new GoogleStrategy({
+    clientID: config.auth.google.clientId,
+    clientSecret: config.auth.google.clientSecret,
+    callbackURL: config.externalUrl+"/login/google/callback",
+    passReqToCallback : true
+  },
+	function(req, accessToken, refreshToken, profile, done) {
+		console.log(profile);
+		if(!req.user) { // Use is not logged in, check if we can login user
+
+			return app.db.models.User.findOne({where: {googleId: profile.id}}).then(function(user){
+				var attributes = profileAttributesFromGoogle(user, profile);
+
+				if(!user) {// Create new user but don't save it yet
+					console.log("building temporary google user");
+					return _.extend({temporary: true, googleId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes);
+				}
+
+				// Update attribute of user if needed
+				return _.isEmpty(attributes) ? user : user.updateAttributes(attributes);
+				
+			}).then(function(user){
+				return done(null, user); 
+			}).catch(function(error){
+				return done(new Error("already exist"), false)
+			});
+		} else { // User is already logged in, link account
+			return req.user.updateAttributes(_.extend({googleId: profile.id}, profileAttributesFromGoogle(req.user, profile))).then(function(user){
+				return done(null, user)
+			}).catch(function(error){
+				return done(error, false)
+			});;
+		}
+	}
+));
+
+
 
 passport.serializeUser(function (user, done) {
 	done(null, user.id);
@@ -120,6 +210,25 @@ passport.deserializeUser(function (id, done) {
 });
 
 
+
+
+app.use(function (req, res, next) {
+	// Flash messages
+        res.locals.flash_success = req.flash('success');
+        res.locals.flash_error = req.flash('error');
+
+	// Token cleanup
+        if(!req.session || !req.user || !req.session.deviceToken) {// no token set, no need to clear it
+                return next();
+        }else if(req.user.id == req.session.deviceToken.userId && (req.originalUrl === "/devices/"+req.session.deviceToken.deviceId || req.originalUrl === "/devices/"+req.session.deviceToken.deviceId+"/credentials/download" || req.originalUrl === "/devices/"+req.session.deviceToken.deviceId+"/credentials/send" )) {//token is set and target is download or send, don't clear token
+                return next();
+        } else { // Target is neither download nor send, clear token
+                req.session.deviceToken = undefined
+        }
+  return next()
+});
+
+
 // View routes
 app.post('/profile/sync', function (req, res) {
 	if (!req.user) {
@@ -131,6 +240,20 @@ app.post('/profile/sync', function (req, res) {
 		res.redirect("/profile");
 	})
 })
+
+app.get('/profile/link/github', passport.authorize('github', {
+	scope: [ 'user:email' ], 
+  successRedirect : '/profile',
+	failureRedirect : '/'
+	})
+)
+
+app.get('/profile/link/twitter', passport.authorize('twitter', { 
+  successRedirect : '/profile',
+	failureRedirect : '/'
+	})
+)
+
 
 app.get('/register', function (req, res) {
 	res.render('register');
@@ -164,13 +287,12 @@ app.post('/devices/add', function (req, res) {
 		return res.redirect("/devices/add");
 	}
 
-	console.log("creating device: " + devicename);
-
 	app.db.connection.transaction(function (t) {
+		console.log("creating device: " + devicename);
 		return req.user.addDev(devicename) 
 	}).then(function (device) {
-		req.session.plainAccessToken = device.plainAccessToken;
-		device.plainAccessToken = undefined;
+		req.session.deviceToken = device.token;
+		device.token = undefined;
 		req.flash("success", "Device added");
 		return res.redirect('/devices/' + device.id);
 	}).catch (function (error) {
@@ -207,7 +329,7 @@ app.post('/devices/:id/delete', function (req, res) {
 	})
 })
 
-app.post('/devices/:id/reset', function (req, res) {
+app.post('/devices/:id/credentials/reset', function (req, res) {
 	if (!req.user)
 		res.redirect("/login")
 
@@ -220,10 +342,9 @@ app.post('/devices/:id/reset', function (req, res) {
 			return device.resetToken();
 		})
 	}).then(function (device) {
-		req.session.plainAccessToken = device.plainAccessToken;
-		device.plainAccessToken = undefined;
-		req.flash("success", "New device cretentials generated.");
-		app.mailer.sendDeviceTokenResetNotification({user: req.user, device: device}, function(error, responseStatusMessage, html, text){});
+		req.session.deviceToken = device.token;
+		device.token = undefined;
+		req.flash("success", "New device credentials generated.");
 
 		return res.redirect('/devices/' + device.id);
 	}).catch (function (error) {
@@ -243,17 +364,17 @@ app.get('/devices/:id', function (req, res) {
 			throw new Error("The object could not be found");
 		}
 
-		var accessToken = req.session.plainAccessToken;
+		var deviceToken; 
+		if(req.session.deviceToken && req.session.deviceToken.deviceId == device.id && req.session.deviceToken.userId == req.user.id)
+			deviceToken = req.session.deviceToken;
 		var firstStart = req.session.firstStart;
-
 		// Clean up session
 		req.session.firstStart = undefined
-		req.session.plainAccessToken = undefined;
 		
 		res.render('device', {
 			device : device,
 			user : req.user,
-			accessToken : accessToken,
+			deviceToken : deviceToken,
 			firstStart : firstStart != undefined
 		});
 	}).catch (function (error) {
@@ -262,6 +383,65 @@ app.get('/devices/:id', function (req, res) {
 	});
 	
 })
+
+app.get('/devices/:id/credentials/download', function (req, res) {
+	if(!req.user)
+		return res.redirect("/login");
+
+	var deviceToken;
+        if(req.session.deviceToken && req.session.deviceToken.deviceId == req.params.id && req.session.deviceToken.userId == req.user.id)
+        	deviceToken = req.session.deviceToken
+	else {
+		req.flash("error", "Please generate new creadentials for this device to download them");
+                return res.redirect("/devices/"+req.params.id)
+	}
+  
+        return app.db.models.Device.findOne({where: {id: req.params.id, userId: req.user.id}}).then(function (device) {
+	        if (!device) {
+       	         throw new Error("The object could not be found");
+               }
+       
+		res.setHeader('Content-disposition', 'attachment; filename=' + req.user.username+"-"+device.devicename+".otrc");
+		res.setHeader('Content-type', 'application/json');
+		res.charset = 'UTF-8';
+		res.send(device.getOtrcPayload(req.user, deviceToken));
+	}).catch (function (error) {
+                req.flash("error", error.toString().replace("Error: ", ""));
+                return res.redirect("/")
+        });
+});
+
+app.post('/devices/:id/credentials/send', function (req, res) {
+      if(!req.user)
+          return res.redirect("/login");
+
+        var deviceToken;
+        if(req.session.deviceToken && req.session.deviceToken.deviceId == req.params.id && req.session.deviceToken.userId == req.user.id)
+                deviceToken = req.session.deviceToken
+        else {
+                req.flash("error", "Please generate new creadentials for this device to download them");
+                return res.redirect("/devices/"+req.params.id)
+        }
+
+        return app.db.models.Device.findOne({where: {id: req.params.id, userId: req.user.id}}).then(function (device) {
+                if (!device) {
+                 throw new Error("The object could not be found");
+               }
+		
+		app.mailer.sendDeviceToken({user: req.user, device: device, payload: device.getOtrcPayload(req.user, deviceToken)}, function(error, code){
+			if(!error)
+		        	req.flash("success", "A mail containing the device credentials have been sent to you");
+                	else
+				req.flash("error", "An error occured while sending a mail, please try again later"); 	
+			return res.redirect("/devices/"+req.params.id)
+		})
+        }).catch (function (error) {
+                req.flash("error", error.toString().replace("Error: ", ""));
+                return res.redirect("/")
+        });
+
+});
+
 
 
 app.get('/trackers/add', function (req, res) {
@@ -557,7 +737,7 @@ app.post('/profile/recover', function (req, res) {
 
 		})
 	}).then(function(user) {
-		app.mailer.sendPasswordResetLink(user, function(){});
+		app.mailer.sendPasswordResetLink(user);
 		req.flash('success', "We send you a recovery link");
 		res.redirect('/profile/recover');
 	}).catch(function(error) {
@@ -630,6 +810,7 @@ app.post('/profile/reset/:token', function (req, res) {
 	}).then(function(user){
 		return req.logIn(user, function(err) {
 			req.flash("success", "Password updated");
+			app.mailer.sendPasswordChangedNotification(user);
 			return res.redirect("/");
 		});
 
@@ -744,9 +925,6 @@ app.post('/register', function (req, res, next) {
 			email : email,
 			password : password,
 			fullname: fullname
-		}).then(function (u) {
-			user = u;
-			return user.updateFace();
 		}).then(function (user) {
 			return user.addDev(devicename)
 		})
@@ -759,15 +937,15 @@ app.post('/register', function (req, res, next) {
 				next(err)
 			}
 
-			req.session.plainAccessToken = device.plainAccessToken;
-			device.plainAccessToken = undefined;
+			req.session.deviceToken = device.token;
+			device.token = undefined;
 			req.session.firstStart = true;
 
 			return res.redirect('/devices/' + device.id);
 		});
 	}).catch (function (error) {
 			if(error.name === "SequelizeUniqueConstraintError") {
-				req.flash("error", "The specified details already exist");
+				req.flash("error", "A user with the specified details already exist");
 			}else {
 				req.flash("error", error.toString().replace("Error: ", ""));
 			}
@@ -776,23 +954,76 @@ app.post('/register', function (req, res, next) {
 	});
 });
 
-// Render the login page.
-app.get('/login', function (req, res) {
-	res.render('login', {
-		title : 'Login',
-		error : req.flash('error')[0]
+
+var authCallback = function(req, res, next, err, user) {	
+	if(!user || err) {
+		console.log("authCallback primary error: ");
+		console.log(err);
+
+		req.flash("error", "Login failed");
+		return res.redirect("/login");
+	}
+	return req.logIn(user, function(error) {
+		if(error) {
+				console.log("authCallback secondary error: ");
+				console.log(error);
+
+			req.flash("error", "Login failed");
+			return res.redirect("/login");
+		}
+		return res.redirect("/");
 	});
+}
+
+// Local login
+app.get('/login', function (req, res) {res.render('login');});
+app.post('/login', function(req, res, next) {
+	return passport.authenticate('local', function(err, user) {console.log(err); return authCallback(req, res, next, err, user)})(req, res, next); 
 });
 
-// Authenticate a user.
-app.post('/login', passport.authenticate('local', {
-		successRedirect : '/',
-		failureRedirect : '/login',
-		session : true,
-		failureFlash : 'Invalid username or password'
-	}));
+// Github login
+app.get('/login/github', passport.authenticate('github', {scope: [ 'user:email' ]}));
+app.get('/login/github/callback', function(req, res, next) {
+	return passport.authenticate('github', function(err, user) {return authCallback(req, res, next, err, user)})(req, res, next); 
+});
 
-// Logout the user, then redirect to the home page.
+// Google login
+app.get('/login/google', passport.authenticate('google', {scope: [ 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile' ]}));
+app.get('/login/google/callback', function(req, res, next) {
+		return passport.authenticate('google', function(err, user) {
+			console.log("temporary " + user.temporary);
+
+			if(err || !user.temporary){  
+				return authCallback(req, res, next, err, user)
+			}else { 
+				req.session.temporaryUserGoogle = user; 
+				return res.redirect("/login/google/finish");
+			}
+
+		})(req, res, next); 
+});
+app.get('/login/google/finish', function(req, res, next) {
+		return res.render('profile-finish-google');
+});
+app.post('/login/google/finish', function(req, res, next) {
+	var user = req.session.temporaryUserGoogle;
+
+	if(!user || !req.body.username || req.body.username == "") {
+		return authCallback(req, res, next, new Error("no user or username"), null)
+	}
+	
+	user.username = req.body.username; 
+
+	app.db.models.User.create(user).then(function(u) {
+		console.log("user saved");
+		return authCallback(req, res, next, null, u)		
+	}).catch(function(err) {
+		console.log(err);
+		return authCallback(req, res, next, err, null)
+	}); 
+
+});
+
 app.get('/logout', function (req, res) {
 	req.logout();
 	res.redirect('/');
@@ -834,6 +1065,9 @@ app.use(function (req, res, next) {
 		user : req.user,
 	});		
 });
+
+
+
 
 // error handlers
 

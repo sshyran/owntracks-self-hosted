@@ -1,7 +1,7 @@
 extends layout
 
 block flash
-  - var flash = 4
+  - var flashClass = "col-xs-12 col-sm-6 col-sm-offset-3";
 
 block body
   .row
@@ -17,6 +17,21 @@ block body
             dd= user.fullname
             dt Mail
             dd= user.email
+            hr.full
+            dt Github Id
+            dd
+              - if(user.githubId)
+                = user.githubId
+                a(href="/profile/unlink/github") 
+              -else 
+                a(href="/profile/link/github") Link
+            dt Twitter Id      
+            dd
+              - if(user.twitterId)
+                = user.twitterId
+                a(href="/profile/unlink/twitter") 
+              -else 
+                a(href="/profile/link/twitter") Link
         .panel-footer
           form.bs-example.form-horizontal(method='post', action='/profile/delete')
             button.pull-left.btn.btn-danger(type='submit', value="delete") Delete

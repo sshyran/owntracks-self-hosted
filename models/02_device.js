@@ -25,9 +25,10 @@ module.exports = function (sequelize, DataTypes) {
 					return instance.getUser().then(function(user){
 					
 						if(user)
-							instance.updateFace(user);
+							return instance.updateFace(user);
 					}).finally(function(error){
-						fn();
+						console.log("calling callback"); 
+						fn(null, instance);
 					})
 				},
 				afterDestroy: function(instance, options, fn){
@@ -37,7 +38,7 @@ module.exports = function (sequelize, DataTypes) {
 						if(user)
 							instance.clearFace(user);
 					}).finally(function(){
-						fn();
+						fn(null, instance);
 					})
 				}
 
@@ -45,11 +46,13 @@ module.exports = function (sequelize, DataTypes) {
 			instanceMethods : {
 				resetToken : function (user) {
 					var token = Device.generateToken();
+                                        token.deviceId= this.id;
+                                        token.userId =this.userId;
 
 					return this.updateAttributes({
 						accessToken : token.pbkdf2
 					}).then(function (device) {
-						device.plainAccessToken = token.plain;
+						device.token = token;
 						return device;
 					});
 				},
@@ -58,10 +61,12 @@ module.exports = function (sequelize, DataTypes) {
 					console.log("updating device face of device: " + this.id);
 					var face = {
 						"_type" : "card",
-						"face" : user.photo
 					};
 					if(user.username != "") {
 						face['name'] = user.fullname
+					}
+					if(user.photo) {
+						face['face'] = user.photo;						
 					}
 					
 					return app.broker.connection.publish(this.getFaceTopic(user), JSON.stringify(face), {
@@ -93,6 +98,9 @@ module.exports = function (sequelize, DataTypes) {
 				getLogin : function (user) {
 					return user.getUsername() + "|" + this.devicename;
 				},
+				getOtrcPayload: function(user, token) {
+					return {"_type":"configuration", "username":user.username, "mode":1, "deviceId": this.devicename,"password": token.plain}
+				}
 
 			},
 			classMethods : {
@@ -101,7 +109,8 @@ module.exports = function (sequelize, DataTypes) {
 					Device.belongsTo(models.User, {foreignKey: "userId"});
 					Device.hasMany(models.Share, {foreignKey: 'trackedDeviceId', onDelete: 'cascade'});
 				},
-				generateToken : function () {
+				generateToken : function (user) {
+					var self = this; 
 					var accessToken = base32.encode(crypto.randomBytes(8));
 					
 					
@@ -115,7 +124,7 @@ module.exports = function (sequelize, DataTypes) {
 						return {
 						plain : accessToken,
 						pbkdf2 : pbkdf2
-					}
+						}
 				}
 			}
 		}

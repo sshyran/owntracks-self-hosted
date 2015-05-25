@@ -3,7 +3,7 @@ html
 	head
 		meta(charset='utf-8')
 		meta(content='width=device-width, initial-scale=1', name='viewport')
-		title= 'OwnTracks Hosted'
+		title= 'OwnTracks Hosted Beta'
 		link(href='/css/bootstrap.css', rel='stylesheet')
 		link(href='/css/app.css', rel='stylesheet')
 	body
@@ -18,7 +18,7 @@ html
 								span.icon-bar
 								span.icon-bar
 								span.icon-bar
-						a(class="navbar-brand" href="/") OwnTracks Hosted
+						a(class="navbar-brand" href="/") OwnTracks Hosted Beta
 					- if(user)
 						div(id="navbar", class="navbar-collapse collapse in")
 							ul(class="nav navbar-nav navbar-right")
@@ -37,18 +37,16 @@ html
 
     
 		.container-fluid
+			- var flashClass = 'col-xs-12';
 			block flash
-				- var flashLength = 6; 
-				- if(flash)
-					- flashLength = flash; 
-				- if(flash_error.length > 0)
-					.row.flash
-						div(class="col-lg-#{flashLength} col-lg-offset-#{Math.floor((12-flashLength)/2)}")
-							.alert.alert-danger !{flash_error}
-				- if(flash_success.length > 0)
-					.row.flash
-						div(class="col-lg-#{flashLength} col-lg-offset-#{Math.floor((12-flashLength)/2)}")
-							.alert.alert-success !{flash_success}
+			- if(flash_error.length > 0)
+				.row.flash
+					div(class="#{flashClass}")
+						.alert.alert-danger !{flash_error}
+			- if(flash_success.length > 0)
+				.row.flash
+					div(class="#{flashClass}")
+						.alert.alert-success !{flash_success}
 
 			.row
 				.col-sm-12
