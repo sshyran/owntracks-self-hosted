@@ -8,15 +8,17 @@ block body
     .col-xs-12.col-sm-6.col-sm-offset-3
       .panel.panel-default#profile
         .panel-heading
-          h4 Finish Google Login
-        form.bs-example.form-horizontal(method='post', action='/login/google/finish')
+          h4 Finish Facebook Login
+        form.bs-example.form-horizontal(method='post', action='/login/facebook/finish')
           .panel-body
-            fieldset
-              .form-group
-                .col-lg-12
-                  p 
-                    | Please fill in the details below to complete your account creation process.
+            p 
+              | Please fill in the details below to complete your account creation process. 
+            .col-xs-12
+              fieldset
+                .form-group
                   input#username.form-control(name='username', type='username', placeholder='Username', required)
+                .form-group
+                  input#email.form-control(name='email', type='email', placeholder='Email', required)
           .panel-footer
             button.pull-right.btn.btn-primary(type='submit', value="delete") Finish
             .clearfix

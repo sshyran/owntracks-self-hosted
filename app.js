@@ -13,6 +13,8 @@ var LocalStrategy = require('passport-local').Strategy;
 var GithubStrategy = require('passport-github2').Strategy;
 var TwitterStrategy = require('passport-twitter').Strategy;
 var GoogleStrategy = require( 'passport-google-oauth2' ).Strategy;
+var FacebookStrategy = require( 'passport-facebook' ).Strategy;
+
 var crypto = require('crypto');
 var session = require('express-session');
 var RedisStore = require('connect-redis')(session);
@@ -118,6 +120,26 @@ var profileAttributesFromGoogle = function(user, profile) {
 
 		return attributes; 
 }
+
+var profileAttributesFromTwitter = function(user, profile) {
+		var attributes = {}; 
+		if(!user || !user.username)	
+			attributes['username'] = profile.username.replace(/[^A-Za-z0-9]/gi, ''); 	
+		if(!user || !user.displayName)	
+			attributes['fullname'] = profile.displayName;
+
+		return attributes; 
+}
+
+var profileAttributesFromFacebook = function(user, profile) {
+		var attributes = {}; 
+		if(!user || !user.displayName)	
+			attributes['fullname'] = profile.displayName;
+
+		return attributes; 
+}
+
+
 passport.use(new GithubStrategy({
     clientID: config.auth.github.clientId,
     clientSecret: config.auth.github.clientSecret,
@@ -167,7 +189,7 @@ passport.use(new GoogleStrategy({
 	function(req, accessToken, refreshToken, profile, done) {
 		console.log(profile);
 		if(!req.user) { // Use is not logged in, check if we can login user
-
+			console.log("user is not logged in")
 			return app.db.models.User.findOne({where: {googleId: profile.id}}).then(function(user){
 				var attributes = profileAttributesFromGoogle(user, profile);
 
@@ -194,7 +216,78 @@ passport.use(new GoogleStrategy({
 	}
 ));
 
+passport.use(new TwitterStrategy({
+    consumerKey: config.auth.twitter.clientId,
+    consumerSecret: config.auth.twitter.clientSecret,
+    callbackURL: config.externalUrl+"/login/twitter/callback",
+    passReqToCallback : true
+  },
+	function(req, accessToken, refreshToken, profile, done) {
+		console.log(profile);
+		if(!req.user) { // Use is not logged in, check if we can login user
+			console.log("user is not logged in")
+			return app.db.models.User.findOne({where: {twitterId: profile.id}}).then(function(user){
+				var attributes = profileAttributesFromTwitter(user, profile);
 
+				if(!user) {// Create new user but don't save it yet
+					console.log("building temporary twitter user");
+					return _.extend({temporary: true, twitterId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes);
+				}
+
+				// Update attribute of user if needed
+				return _.isEmpty(attributes) ? user : user.updateAttributes(attributes);
+				
+			}).then(function(user){
+				return done(null, user); 
+			}).catch(function(error){
+				return done(new Error("already exist"), false)
+			});
+		} else { // User is already logged in, link account
+			return req.user.updateAttributes(_.extend({twitterId: profile.id}, profileAttributesFromTwitter(req.user, profile))).then(function(user){
+				return done(null, user)
+			}).catch(function(error){
+				return done(error, false)
+			});;
+		}
+	}
+));
+
+passport.use(new FacebookStrategy({
+    clientID: config.auth.facebook.clientId,
+    clientSecret: config.auth.facebook.clientSecret,
+    callbackURL: config.externalUrl+"/login/facebook/callback",
+    enableProof: true,
+    passReqToCallback : true
+  },
+	function(req, accessToken, refreshToken, profile, done) {
+		console.log(profile);
+		if(!req.user) { // Use is not logged in, check if we can login user
+			console.log("user is not logged in")
+			return app.db.models.User.findOne({where: {facebookId: profile.id}}).then(function(user){
+				var attributes = profileAttributesFromFacebook(user, profile);
+
+				if(!user) {// Create new user but don't save it yet
+					console.log("building temporary facebook user");
+					return _.extend({temporary: true, facebookId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes);
+				}
+
+				// Update attribute of user if needed
+				return _.isEmpty(attributes) ? user : user.updateAttributes(attributes);
+				
+			}).then(function(user){
+				return done(null, user); 
+			}).catch(function(error){
+				return done(new Error("already exist"), false)
+			});
+		} else { // User is already logged in, link account
+			return req.user.updateAttributes(_.extend({facebookId: profile.id}, profileAttributesFromFacebook(req.user, profile))).then(function(user){
+				return done(null, user)
+			}).catch(function(error){
+				return done(error, false)
+			});;
+		}
+	}
+));
 
 passport.serializeUser(function (user, done) {
 	done(null, user.id);
@@ -247,6 +340,12 @@ app.get('/profile/link/github', passport.authorize('github', {
 	failureRedirect : '/'
 	})
 )
+app.get('/profile/link/google', passport.authenticate('google', {
+	scope: [ 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile' ],
+  successRedirect : '/profile',
+	failureRedirect : '/'
+	})
+)
 
 app.get('/profile/link/twitter', passport.authorize('twitter', { 
   successRedirect : '/profile',
@@ -254,6 +353,11 @@ app.get('/profile/link/twitter', passport.authorize('twitter', {
 	})
 )
 
+app.get('/profile/link/facebook', passport.authorize('facebook', { 
+  successRedirect : '/profile',
+	failureRedirect : '/'
+	})
+)
 
 app.get('/register', function (req, res) {
 	res.render('register');
@@ -827,11 +931,12 @@ app.post('/profile/delete', function (req, res, next) {
 		res.redirect("/login")
 
 	return app.db.connection.transaction(function (t) {
+
 		return req.user.destroy()
 	}).then(function(user) {
 		req.flash('success', "Your profile was deleted");
 		req.logout();
-		res.redirect('/');
+		return res.redirect('/');
 	}).catch(function(error) {
 		req.flash("error", error.toString().replace("Error: ", ""));
 		return res.redirect("/profile");
@@ -991,9 +1096,8 @@ app.get('/login/github/callback', function(req, res, next) {
 app.get('/login/google', passport.authenticate('google', {scope: [ 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile' ]}));
 app.get('/login/google/callback', function(req, res, next) {
 		return passport.authenticate('google', function(err, user) {
-			console.log("temporary " + user.temporary);
 
-			if(err || !user.temporary){  
+			if(err || !user || !user.temporary){  
 				return authCallback(req, res, next, err, user)
 			}else { 
 				req.session.temporaryUserGoogle = user; 
@@ -1023,6 +1127,83 @@ app.post('/login/google/finish', function(req, res, next) {
 	}); 
 
 });
+
+
+// Twitter login
+app.get('/login/twitter', passport.authenticate('twitter'));
+app.get('/login/twitter/callback', function(req, res, next) {
+		return passport.authenticate('twitter', function(err, user) {
+
+			if(err || !user || !user.temporary){  
+				return authCallback(req, res, next, err, user)
+			}else { 
+				req.session.temporaryUserTwitter = user; 
+				return res.redirect("/login/twitter/finish");
+			}
+
+		})(req, res, next); 
+});
+app.get('/login/twitter/finish', function(req, res, next) {
+		return res.render('profile-finish-twitter');
+});
+app.post('/login/twitter/finish', function(req, res, next) {
+	var user = req.session.temporaryUserTwitter;
+
+	if(!user || _.isEmpty(req.body.email)) {
+		return authCallback(req, res, next, new Error("no user or email"), null)
+	}
+	
+	user.email = req.body.email; 
+
+	app.db.models.User.create(user).then(function(u) {
+		console.log("user saved");
+		return authCallback(req, res, next, null, u)		
+	}).catch(function(err) {
+		console.log(err);
+		return authCallback(req, res, next, err, null)
+	}); 
+
+});
+
+// Twitter login
+app.get('/login/facebook', passport.authenticate('facebook'));
+app.get('/login/facebook/callback', function(req, res, next) {
+		return passport.authenticate('facebook', function(err, user) {
+
+			if(err || !user || !user.temporary){  
+				return authCallback(req, res, next, err, user)
+			}else { 
+				req.session.temporaryUserFacebook = user; 
+				return res.redirect("/login/facebook/finish");
+			}
+
+		})(req, res, next); 
+});
+app.get('/login/facebook/finish', function(req, res, next) {
+		return res.render('profile-finish-facebook');
+});
+app.post('/login/facebook/finish', function(req, res, next) {
+	var user = req.session.temporaryUserFacebook;
+
+	if(!user || _.isEmpty(req.body.username) || _.isEmpty(req.body.email)) {
+		return authCallback(req, res, next, new Error("no user or username or email"), null)
+	}
+	
+	user.username = req.body.username; 
+	user.email = req.body.email; 
+
+	app.db.models.User.create(user).then(function(u) {
+		console.log("user saved");
+		return authCallback(req, res, next, null, u)		
+	}).catch(function(err) {
+		console.log(err);
+		return authCallback(req, res, next, err, null)
+	}); 
+
+});
+
+
+
 
 app.get('/logout', function (req, res) {
 	req.logout();

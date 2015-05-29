@@ -1,7 +1,7 @@
 extends layout
 
 block flash 
-  - var flashClass = "col-xs-12 col-sm-6 col-sm-offset-3"; 
+  - var flashClass = "col-xs-12 col-sm-8 col-sm-offset-2"; 
 block body
   .row
     .col-xs-12.col-sm-4.col-sm-offset-2
@@ -33,6 +33,12 @@ block body
       .panel.panel-default#login
         .panel-heading
           h4 Alternative Logins
-        .panel-body
-          a(href="/login/github") Login with Github
-    
+        ul.list-group
+          li.list-group-item 
+            a(href="/login/github") Login with Github
+          li.list-group-item 
+            a(href="/login/google") Login with Google
+          li.list-group-item 
+            a(href="/login/twitter") Login with Twitter 
+          li.list-group-item 
+            a(href="/login/facebook") Login with Facebook 

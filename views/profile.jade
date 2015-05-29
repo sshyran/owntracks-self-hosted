@@ -32,6 +32,20 @@ block body
                 a(href="/profile/unlink/twitter") 
               -else 
                 a(href="/profile/link/twitter") Link
+            dt Google Id      
+            dd
+              - if(user.googleId)
+                = user.googleId
+                a(href="/profile/unlink/google") 
+              -else 
+                a(href="/profile/link/google") Link
+            dt Facebook Id      
+            dd
+              - if(user.facebookId)
+                = user.facebookId
+                a(href="/profile/unlink/facebook") 
+              -else 
+                a(href="/profile/link/facebook") Link
         .panel-footer
           form.bs-example.form-horizontal(method='post', action='/profile/delete')
             button.pull-left.btn.btn-danger(type='submit', value="delete") Delete
