@@ -45,14 +45,15 @@ app.use(session({
 app.use(flash());
 
 
+require('./backend/logger.js')(app);
 require('./backend/db.js')(app);
 require('./backend/broker.js')(app);
 require('./backend/statsd.js')(app);
 require('./backend/mailer.js')(app);
 
-
-//app.statsd.increment('startups')
-
+console.log = app.logger.info; 
+console.err = app.logger.error;
+ 
 // Check supported crypto hashes
 debug("Supported hashes: " + crypto.getHashes());
 
@@ -1030,7 +1031,8 @@ app.post('/register', function (req, res, next) {
 			email : email,
 			password : password,
 			fullname: fullname
-		}).then(function (user) {
+		}).then(function (u) {
+			user = u; 
 			return user.addDev(devicename)
 		})
 	}).then(function(d){

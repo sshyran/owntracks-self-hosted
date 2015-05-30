@@ -1,12 +1,13 @@
 [Service]
-ExecStart=[node binary] /home/srv-node-sample/[main file]
+WorkingDirectory=/var/www/traction
+ExecStart=/usr/local/nvm/versions/node/v0.12.2/bin/node app.js
 Restart=always
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=traction
 User=traction
 Group=traction
-Environment=NODE_ENV=production
+Environment='NODE_ENV=production'
 
 [Install]
 WantedBy=multi-user.target

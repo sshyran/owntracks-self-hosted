@@ -22,6 +22,7 @@ module.exports = function(app) {
 			min: 0,
 			idle: 10000
 		},
+		logging: app.logger.debug,
 		native: true, 
 	});
 	app.db.connection.app = app; 

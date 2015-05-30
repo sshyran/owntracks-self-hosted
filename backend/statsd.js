@@ -12,6 +12,11 @@ var statsdMiddleware = LynxExpress(metrics);
 module.exports = function(app) {
 	app.statsd = metrics; 
 
-	app.use(statsdMiddleware({timeByUrl: true}))
+	app.use("/", statsdMiddleware({timeByUrl: true}))
+	app.use("/login", statsdMiddleware({timeByUrl: true}))
+	app.use("/register", statsdMiddleware({timeByUrl: true}))
+	app.use("/logout", statsdMiddleware({timeByUrl: true}))
+	app.use("/profile", statsdMiddleware({timeByUrl: true}))
+
 }
 
