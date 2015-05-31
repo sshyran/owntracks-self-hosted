@@ -153,27 +153,20 @@ module.exports = function (sequelize, DataTypes) {
 				authenticate : function (password, done) {
 					var pbkdf2 = this.password.split("$");
 
-					console.log("rounds: " + parseInt(pbkdf2[2]));
-					console.log("saltB64: " + pbkdf2[3]);
-					console.log("hash: " + pbkdf2[4]);
-
 					//"PBKDF2$%s$%d$%s$%s", config.passwordOptions.algorithm, config.passwordOptions.rounds, saltB64, passwordHashB64)""
 					//  0                    1                          2                       3        4
 					var hashRaw = crypto.pbkdf2Sync(password, pbkdf2[3], parseInt(pbkdf2[2]), config.passwordOptions.keyLength);
 					if (!hashRaw)
-						return done(new Error("Password is incorrect"), false);
-
-					console.log("cmp : " + new Buffer(hashRaw, 'binary').toString('base64'));
+						return done("empty hash", false);
 
 					if (new Buffer(hashRaw, 'binary').toString('base64') === pbkdf2[4]) {
 						return done(null, this);
 					} else {
-						return done(new Error("Password is incorrect"), false);
+						return done("incorrect password", false);
 					}
 				},
 				resolveGravatar : function () {
 					var queryUrl = 'http://www.gravatar.com/avatar/' + crypto.createHash('md5').update(this.email.toLowerCase().trim()).digest('hex') + "?d=mm&s=40";
-					console.log("Gravatar query: " + queryUrl);
 
 					return request({
 						method : "GET",
@@ -184,7 +177,7 @@ module.exports = function (sequelize, DataTypes) {
 							return null;
 						return new Buffer(response.body, 'binary').toString('base64');
 					}).catch (function (error) {
-						console.error(error);
+						app.logger.error(error);
 					})
 				},
 
@@ -192,6 +185,9 @@ module.exports = function (sequelize, DataTypes) {
 					var self = this;
 					return app.db.models.Share.create({trackingUserId: toUser.id, trackedDeviceDevicename: device.devicename,  accepted: false, trackedUserId: this.id, trackedDeviceId: device.id}).then(function(share){
 						return app.db.models.Permission.create({userId: toUser.id, username: toUser.username, deviceId: device.id, shareId: share.id, topic: device.getROTopic(self), rw: "1"});
+					}).then(function(permission){
+						console.log("sending mail");
+						return app.mailer.sendNewTrackingUserNotification({user: toUser, otherUser: self, otherUserDevice: device, permission: permission});
 					});
 				},
 

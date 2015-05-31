@@ -45,6 +45,7 @@
     "serve-favicon": "~2.2.0",
     "stylus": "0.42.3",
     "underscore": "^1.8.3",
-    "winston": "^1.0.0"
+    "winston": "^1.0.0",
+    "winston-request-logger": "^1.0.7"
   }
 }

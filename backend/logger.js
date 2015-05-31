@@ -1,9 +1,10 @@
 var config = require('../config.json');
 var winston = require('winston');
 
-winston.add(winston.transports.File, { filename: 'traction.log', level: 'debug' });
+var logger = new (winston.Logger)({ transports: [ new (winston.transports.Console)({colorize:true}) ] });
 
 module.exports = function(app) {
-	app.logger = winston; 
+	app.logger = logger; 
+        app.use(require('winston-request-logger').create(logger));
 }
 

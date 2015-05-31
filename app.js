@@ -26,7 +26,6 @@ var _ =require('underscore');
 var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
-app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended : false}));
 app.use(cookieParser());
@@ -53,6 +52,7 @@ require('./backend/mailer.js')(app);
 
 console.log = app.logger.info; 
 console.err = app.logger.error;
+debug = app.logger.debug;
  
 // Check supported crypto hashes
 debug("Supported hashes: " + crypto.getHashes());
@@ -91,7 +91,7 @@ passport.use(new LocalStrategy(
 	function (username, password, done) {
 		return app.db.models.User.findByUsername(username).then(function (user) {
 			if (!user) {
-				return done(new Error("User not found"), false);
+				return done(username +" not found", false);
 			}
 			return user.authenticate(password, done);
 		}).catch (function (error) {
@@ -149,14 +149,12 @@ passport.use(new GithubStrategy({
   },
   function(req, accessToken, refreshToken, profile, done) {
 		if(!req.user) { // Use is not logged in, check if we can login user
+			app.logger.info("github login");
 			return app.db.models.User.findOne({where: {githubId: profile.id}}).then(function(user){
 				var attributes = profileAttributesFromGithub(user, profile);
-				console.log("attributes for create or update");
-				console.log(attributes);
 
 				if(!user) // Create new user from Github profile
 					return app.db.models.User.create(_.extend({githubId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes));
-
 
 				// Update attribute of user if needed
 				return _.isEmpty(attributes) ? user : user.updateAttributes(attributes);
@@ -164,16 +162,13 @@ passport.use(new GithubStrategy({
 			}).then(function(user){
 				return done(null, user); 
 			}).catch(function(error){
-				console.log("new account account from github failed");
-				console.log(error);
-				return done(new Error("already exist"), false)
+				return done(error, false)
 			});
 		} else { // User is already logged in, link account
+			app.logger.info("github link");
 			return req.user.updateAttributes(_.extend({githubId: profile.id}, profileAttributesFromGithub(req.user, profile))).then(function(user){
 				return done(null, user)
 			}).catch(function(error){
-				console.log("linking account to github failed");
-				console.log(error);
 				return done(error, false)
 			});;
 		}
@@ -190,12 +185,11 @@ passport.use(new GoogleStrategy({
 	function(req, accessToken, refreshToken, profile, done) {
 		console.log(profile);
 		if(!req.user) { // Use is not logged in, check if we can login user
-			console.log("user is not logged in")
+			app.logger.info("google login");
 			return app.db.models.User.findOne({where: {googleId: profile.id}}).then(function(user){
 				var attributes = profileAttributesFromGoogle(user, profile);
 
 				if(!user) {// Create new user but don't save it yet
-					console.log("building temporary google user");
 					return _.extend({temporary: true, googleId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes);
 				}
 
@@ -205,9 +199,10 @@ passport.use(new GoogleStrategy({
 			}).then(function(user){
 				return done(null, user); 
 			}).catch(function(error){
-				return done(new Error("already exist"), false)
+				return done(error, false)
 			});
 		} else { // User is already logged in, link account
+			app.logger.info("google link")
 			return req.user.updateAttributes(_.extend({googleId: profile.id}, profileAttributesFromGoogle(req.user, profile))).then(function(user){
 				return done(null, user)
 			}).catch(function(error){
@@ -226,12 +221,11 @@ passport.use(new TwitterStrategy({
 	function(req, accessToken, refreshToken, profile, done) {
 		console.log(profile);
 		if(!req.user) { // Use is not logged in, check if we can login user
-			console.log("user is not logged in")
+			app.logger.info("twitter login");
 			return app.db.models.User.findOne({where: {twitterId: profile.id}}).then(function(user){
 				var attributes = profileAttributesFromTwitter(user, profile);
 
 				if(!user) {// Create new user but don't save it yet
-					console.log("building temporary twitter user");
 					return _.extend({temporary: true, twitterId: profile.id, password: crypto.randomBytes(32).toString('hex')}, attributes);
 				}
 
@@ -241,9 +235,10 @@ passport.use(new TwitterStrategy({
 			}).then(function(user){
 				return done(null, user); 
 			}).catch(function(error){
-				return done(new Error("already exist"), false)
+				return done(error, false)
 			});
 		} else { // User is already logged in, link account
+			app.logger.info("twitter link");
 			return req.user.updateAttributes(_.extend({twitterId: profile.id}, profileAttributesFromTwitter(req.user, profile))).then(function(user){
 				return done(null, user)
 			}).catch(function(error){
@@ -263,7 +258,7 @@ passport.use(new FacebookStrategy({
 	function(req, accessToken, refreshToken, profile, done) {
 		console.log(profile);
 		if(!req.user) { // Use is not logged in, check if we can login user
-			console.log("user is not logged in")
+			app.logger.info("facebook login");
 			return app.db.models.User.findOne({where: {facebookId: profile.id}}).then(function(user){
 				var attributes = profileAttributesFromFacebook(user, profile);
 
@@ -278,9 +273,10 @@ passport.use(new FacebookStrategy({
 			}).then(function(user){
 				return done(null, user); 
 			}).catch(function(error){
-				return done(new Error("already exist"), false)
+				return done(error, false)
 			});
-		} else { // User is already logged in, link account
+		} else { // User is already logged i)n, link account
+			app.logger.info("facebook link")
 			return req.user.updateAttributes(_.extend({facebookId: profile.id}, profileAttributesFromFacebook(req.user, profile))).then(function(user){
 				return done(null, user)
 			}).catch(function(error){
@@ -535,7 +531,7 @@ app.post('/devices/:id/credentials/send', function (req, res) {
 		
 		app.mailer.sendDeviceToken({user: req.user, device: device, payload: device.getOtrcPayload(req.user, deviceToken)}, function(error, code){
 			if(!error)
-		        	req.flash("success", "A mail containing the device credentials have been sent to you");
+		        	req.flash("success", "A mail containing the device credentials has been sent to you");
                 	else
 				req.flash("error", "An error occured while sending a mail, please try again later"); 	
 			return res.redirect("/devices/"+req.params.id)
@@ -744,7 +740,12 @@ app.post('/trackers/add', function (req, res) {
 
 	if(!deviceId) {
 		req.flash("error", "A device is required to add a tracker");
-		return res.redirect("/");
+		return res.redirect("/trackers/add");
+	}
+
+	if(username == req.user.username) {
+                req.flash("error", "You cannot add yourself as a tracker");
+		return res.redirect("/trackers/add");
 	}
 
 	var device; 
@@ -1064,16 +1065,17 @@ app.post('/register', function (req, res, next) {
 
 var authCallback = function(req, res, next, err, user) {	
 	if(!user || err) {
-		console.log("authCallback primary error: ");
-		console.log(err);
+		//console.log("authCallback primary error: ");
+		app.logger.warn("primary auth failure for user: " + err);
+		//app.logger.warn(err);
 
 		req.flash("error", "Login failed");
 		return res.redirect("/login");
 	}
 	return req.logIn(user, function(error) {
 		if(error) {
-				console.log("authCallback secondary error: ");
-				console.log(error);
+			app.logger.error("secondary auth failure for user");
+			app.logger.error(error);
 
 			req.flash("error", "Login failed");
 			return res.redirect("/login");
@@ -1085,7 +1087,7 @@ var authCallback = function(req, res, next, err, user) {
 // Local login
 app.get('/login', function (req, res) {res.render('login');});
 app.post('/login', function(req, res, next) {
-	return passport.authenticate('local', function(err, user) {console.log(err); return authCallback(req, res, next, err, user)})(req, res, next); 
+	return passport.authenticate('local', function(err, user) {return authCallback(req, res, next, err, user)})(req, res, next); 
 });
 
 // Github login

@@ -33,12 +33,9 @@ block body
       .panel.panel-default#login
         .panel-heading
           h4 Alternative Logins
-        ul.list-group
-          li.list-group-item 
-            a(href="/login/github") Login with Github
-          li.list-group-item 
-            a(href="/login/google") Login with Google
-          li.list-group-item 
-            a(href="/login/twitter") Login with Twitter 
-          li.list-group-item 
-            a(href="/login/facebook") Login with Facebook 
+        .panel-body
+          a(href="/login/facebook" class="altlogin fa fa-facebook")
+          a(href="/login/twitter" class="altlogin fa fa-twitter")
+          a(href="/login/google" class="altlogin fa fa-google")
+          a(href="/login/github" class="altlogin fa fa-github")
+

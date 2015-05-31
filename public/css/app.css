@@ -1,6 +1,12 @@
+html,
+body { height: 100%; }
+
 body {
+border-collapse: collapse;
 background: #F5F5F5;
+display: table;
 color: #212121; 
+width: 100%; 
 font-size : 15px;
 line-height: 1.5rem;  
 padding: 0; 
@@ -464,3 +470,76 @@ select {
 .panel > .list-group:last-child .list-group-item:last-child, .panel > .panel-collapse > .list-group:last-child .list-group-item:last-child {
   border-radius: 0;
 }
+
+.page-row {
+	display: table-row;
+	height: 0;
+}
+.page-row-expanded { height: 100%; }
+
+
+.footer {
+  width: 100%;
+  height: 30px;
+  line-height: 30px; 
+}
+
+.footer .pull-left {
+  margin-left: 15px; 
+}
+
+.footer .pull-right {
+  margin-right: 15px; 
+}
+
+.footer ul {
+  margin-bottom: 0; 
+  margin-right: 15px;
+  min-height: 30px;
+}
+
+.footer, .footer a {
+  color: #888888;
+  font-size: 12px; 
+}
+
+.footer ul li {
+  float: right; 
+  margin-left: 15px; 
+  list-style: none;
+  min-height: 30px;
+}
+
+
+#old {
+ display: none;
+}
+
+
+a.altlogin {
+font-size: 18px !important;
+  float: left;
+  margin-right: 15px;
+  color: #FFF;
+  height: 36px;
+  width: 36px;
+  display: block;
+  text-align: center;
+  line-height: 36px;
+  background-color: #3F72AE;
+  border: 1px solid #345A8B;
+}
+
+a.altlogin:hover {
+  background-color: #325a8f;
+  border-color: #294975;
+}
+
+.btn-primary {
+	border: 1px solid #345A8B;
+}
+
+a.altlogin:hover {
+   text-decoration: none;
+}
+

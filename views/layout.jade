@@ -6,8 +6,10 @@ html
 		title= 'OwnTracks Hosted Beta'
 		link(href='/css/bootstrap.css', rel='stylesheet')
 		link(href='/css/app.css', rel='stylesheet')
+		link(href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css", rel='stylesheet')
+
 	body
-		.page-container
+		.page-container.page-row
 			nav(class="navbar navbar-default navbar-static-top")
 				.container-fluid 
 					.navbar-header
@@ -36,7 +38,7 @@ html
 							.clearfix
 
     
-		.container-fluid
+		.container-fluid.page-row-expanded
 			- var flashClass = 'col-xs-12';
 			block flash
 			- if(flash_error.length > 0)
@@ -51,6 +53,21 @@ html
 			.row
 				.col-sm-12
 					block body
+		footer.footer.page-row
+			div.pull-left
+				| © 2015 OwnTracks
+			ul.navbar-right
+				li
+					a(href="http://owntracks.org/booklet/privacy/#privacy-policy") Privacy Policy
+				li
+					a(href="http://owntracks.org/booklet") Documentation
+				li 
+					a(href="https://github.com/owntracks/hosted/issues") Issues
+				li
+					a(href="https://twitter.com/owntracks") Twitter
+				li
+					a(href="https://community.owntracks.org") Community
+					
 	script(type='text/javascript', src='/js/jquery-2.1.3.min.js')
 	script(type='text/javascript', src='/js/bootstrap.min.js')
 	script(type='text/javascript', src='/js/app.js')

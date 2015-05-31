@@ -27,14 +27,12 @@ module.exports = function (sequelize, DataTypes) {
 						if(user)
 							return instance.updateFace(user);
 					}).finally(function(error){
-						console.log("calling callback"); 
 						fn(null, instance);
 					})
 				},
 				afterDestroy: function(instance, options, fn){
 					//app.statsd.decrement("devices");
 					return instance.getUser().then(function(user){
-						console.log("user for update: " + user); 
 						if(user)
 							instance.clearFace(user);
 					}).finally(function(){
@@ -58,7 +56,6 @@ module.exports = function (sequelize, DataTypes) {
 				},
 
 				updateFace : function (user) {
-					console.log("updating device face of device: " + this.id);
 					var face = {
 						"_type" : "card",
 					};
@@ -76,7 +73,6 @@ module.exports = function (sequelize, DataTypes) {
 				},
 
 				clearFace : function (user) {
-					console.log("clearing face"); 
 					return app.broker.connection.publish(this.getFaceTopic(user), "", {
 						qos : 0,
 						retain : true

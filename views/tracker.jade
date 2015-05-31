@@ -17,11 +17,8 @@ block body
             dd You (#{user.username})
             dt Tracked device
             dd= share.trackedDeviceDevicename
-
             dt Status
             dd= share.accepted ? "Accepted" : "Pending"
-            dt Permissions
-            dd= share.permissions == 1 ? "read" : "read/write" 
 
         .panel-footer
           form.bs-example.form-horizontal(method='post', action='/tracker/#{share.id}/delete')

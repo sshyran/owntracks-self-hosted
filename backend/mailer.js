@@ -18,26 +18,26 @@ var defaultTransport = nodemailer.createTransport(ses({
 module.exports = function(app) {	
 	app.mailer = {};
 
-	app.mailer.sendRegisterNotification = function(user, cb) {
-		sendTemplate("register", user.email, "Welcome", user, cb);
+	app.mailer.sendRegisterNotification = function(data, cb) {
+		sendTemplate("register", data.email, "Welcome", data, cb);
 	}
-	app.mailer.sendPasswordResetLink = function(user, cb) {
-		sendTemplate("passwordReset", user.email, "Password reset", user, cb);
+	app.mailer.sendPasswordResetLink = function(data, cb) {
+		sendTemplate("passwordReset", data.email, "Password reset", data, cb);
 	}
 	app.mailer.sendPasswordChangedNotification = function(user, cb) {
-		sendTemplate("passwordChanged", user.email, "Password changed", user, cb);
+		sendTemplate("passwordChanged", data.email, "Password changed", data, cb);
 	}
-	app.mailer.sendDeviceToken = function(userDevice, cb) {
-		sendTemplate("deviceToken", userDevice.user.email, "Device credentials", userDevice, cb, {
-			filename: userDevice.user.username+"-"+userDevice.device.devicename+".otrc", 
-			content: JSON.stringify(userDevice.payload), 
+	app.mailer.sendDeviceToken = function(data, cb) {
+		sendTemplate("deviceToken", data.user.email, "Device credentials", data, cb, {
+			filename: data.user.username+"-"+data.device.devicename+".otrc", 
+			content: JSON.stringify(data.payload), 
 			contentType: "application/json", 
 			encoding: "utf8",
-			contentDisposition: "attachment; filename=" + userDevice.user.username+"-"+userDevice.device.devicename+".otrc"
+			contentDisposition: "attachment; filename=" + data.user.username+"-"+data.device.devicename+".otrc"
 		});
 	}
-	app.mailer.sendNewTrackingUserNotification = function(user, cb) {
-		sendTemplate("newTracker", user.email, "New tracker", user, cb);
+	app.mailer.sendNewTrackingUserNotification = function(data, cb) {
+		sendTemplate("newTracker", data.user.email, "Shared device", data, cb);
 	}
 
 
