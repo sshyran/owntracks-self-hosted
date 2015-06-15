@@ -26,15 +26,18 @@ module.exports = function (sequelize, DataTypes) {
 					
 						if(user)
 							return instance.updateFace(user);
+						return;
 					}).finally(function(error){
 						fn(null, instance);
 					})
 				},
 				afterDestroy: function(instance, options, fn){
 					//app.statsd.decrement("devices");
+					app.logger.debug("Removed device: " + instance.devicename);
 					return instance.getUser().then(function(user){
 						if(user)
 							instance.clearFace(user);
+						return;
 					}).finally(function(){
 						fn(null, instance);
 					})

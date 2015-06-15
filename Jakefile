@@ -38,16 +38,24 @@ namespace('traction', function () {
 
 		task('seed', [], function () {	  
 			console.log(">> running traction:db:seed");
-
+			var user; 
 			return app.db.models.User.create({
 					username : config.broker.user.split("|")[0],
 					email : "undefined@example.org",
 					password : config.broker.password
-			}).then(function(user) {
+			}).then(function(u) {
+				user = u; 
 				return app.db.models.Permission.create({
 					username : user.username,
 					topic : "#",
 					rw: "2"
+				}).then(function(){
+					return app.db.models.Permission.create({
+                                        	username : user.username,
+                                        	topic : "$SYS/#",
+                                        	rw: "1"
+                                	})
+				
 				})
 			}).catch(function(error) { 
 				console.error("error: " + error); 

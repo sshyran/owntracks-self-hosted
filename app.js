@@ -49,6 +49,7 @@ require('./backend/db.js')(app);
 require('./backend/broker.js')(app);
 require('./backend/statsd.js')(app);
 require('./backend/mailer.js')(app);
+require('./backend/slack.js')(app);
 
 console.log = app.logger.info; 
 console.err = app.logger.error;
@@ -932,10 +933,8 @@ app.post('/profile/delete', function (req, res, next) {
 	if (!req.user)
 		res.redirect("/login")
 
-	return app.db.connection.transaction(function (t) {
 
-		return req.user.destroy()
-	}).then(function(user) {
+	return req.user.destroy().then(function(user) {
 		req.flash('success', "Your profile was deleted");
 		req.logout();
 		return res.redirect('/');
@@ -1223,7 +1222,7 @@ app.get('/', function (req, res) {
 
 	return app.db.connection.transaction(function (t) {
 
-		return req.user.getTrackedUsers({include: [app.db.models.Device]}).then(function(t){
+		return req.user.getTrackedUsers().then(function(t){
 			trackedUsers = t; 
 			return req.user.getTrackingUsers();
 		}).then(function(t){

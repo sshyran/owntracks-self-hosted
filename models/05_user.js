@@ -70,17 +70,15 @@ module.exports = function (sequelize, DataTypes) {
 		}, {
 			hooks: {
         afterCreate: function(instance, options, fn){
-          //app.statsd.increment("users");
           app.mailer.sendRegisterNotification(instance, function(error, responseStatusMessage, html, text){
           	return instance.updateFace().then(function(){
+			app.slack.sendRegisterNotification(instance);
           		fn();
           	}); 
           });
         },
         afterDestroy: function(instance, options, fn){
-					return instance.clearDeviceFaces(function(){
         		fn();
-					})
         }
 
       },
