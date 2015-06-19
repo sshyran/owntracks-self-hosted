@@ -1118,6 +1118,10 @@ app.post('/login/google/finish', function(req, res, next) {
 	if(!user || !req.body.username || req.body.username == "") {
 		return authCallback(req, res, next, new Error("no user or username"), null)
 	}
+
+        if(req.body.username.match(/[^A-Za-z0-9]/)) {
+		return authCallback(req, res, next, new Error("The username may only contain alphanumeric characters"), null)
+        }
 	
 	user.username = req.body.username; 
 
@@ -1191,6 +1195,10 @@ app.post('/login/facebook/finish', function(req, res, next) {
 	if(!user || _.isEmpty(req.body.username) || _.isEmpty(req.body.email)) {
 		return authCallback(req, res, next, new Error("no user or username or email"), null)
 	}
+
+        if(req.body.username.match(/[^A-Za-z0-9]/)) {
+                return authCallback(req, res, next, new Error("The username may only contain alphanumeric characters"), null)
+        }
 	
 	user.username = req.body.username; 
 	user.email = req.body.email; 
