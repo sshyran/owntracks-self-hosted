@@ -11,14 +11,14 @@ Thank you for signing up with us. <br/><br/>
 %>
 <% if(provider) {%>
 	Your new account has been setup and you can now login using your <%= provider.substring(0, 1).toUpperCase() + provider.substring(1) %> credentials.<br/> 
-        To login, visit <a href="<%=locals.externalUrl%>/login/<%=provider%>"><%=locals.config.externalUrl%>/login/<%= provider%></a> <br/><br/>
+        To login, visit <a href="<%=locals.config.externalUrl%>/login/<%=provider%>"><%=locals.config.externalUrl%>/login/<%= provider%></a> <br/><br/>
 <% } else {%>
 	Your new account has been setup and you can now login using the details below.<br/><br/>
 
 	Username: <%= locals.data.username %> <br/>
 	Password: The one you specified during the signup process <br/><br/>
 
-	To login, visit <a href="<%=locals.externalUrl%>/login"><%=locals.config.externalUrl%>/login</a> <br/><br/>
+	To login, visit <a href="<%=locals.config.externalUrl%>/login"><%=locals.config.externalUrl%>/login</a> <br/><br/>
 <% } %>
 
 

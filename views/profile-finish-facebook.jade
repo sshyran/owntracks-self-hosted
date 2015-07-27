@@ -16,7 +16,7 @@ block body
             .col-xs-12
               fieldset
                 .form-group
-                  input#username.form-control(name='username', type='username', placeholder='Username', required)
+                  input#username.form-control(name='username', type='username', placeholder='Username', autofocus, required, pattern="[a-zA-Z0-9]+", oninvalid="this.setCustomValidity('Please enter a valid alphanumeric username')",  onchange="try{this.setCustomValidity('')}catch(e){}")
                 .form-group
                   input#email.form-control(name='email', type='email', placeholder='Email', required)
           .panel-footer

@@ -2,6 +2,7 @@ var crypto = require('crypto');
 var config = require('../config.json')
 var util = require('util')
 var base32 = require('base32')
+var _ =require('underscore');
 
 module.exports = function (sequelize, DataTypes) {
 	var app = sequelize.app; 
@@ -32,15 +33,7 @@ module.exports = function (sequelize, DataTypes) {
 					})
 				},
 				afterDestroy: function(instance, options, fn){
-					//app.statsd.decrement("devices");
-					app.logger.debug("Removed device: " + instance.devicename);
-					return instance.getUser().then(function(user){
-						if(user)
-							instance.clearFace(user);
-						return;
-					}).finally(function(){
-						fn(null, instance);
-					})
+					fn(null, instance); 
 				}
 
 			},	
@@ -62,10 +55,10 @@ module.exports = function (sequelize, DataTypes) {
 					var face = {
 						"_type" : "card",
 					};
-					if(user.username != "") {
+					if(!_.isEmpty(user.username)) {
 						face['name'] = user.fullname
 					}
-					if(user.photo) {
+					if(!_.isEmpty(user.photo)) {
 						face['face'] = user.photo;						
 					}
 					

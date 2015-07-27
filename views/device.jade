@@ -49,5 +49,6 @@ block body
             form.bs-example.form-horizontal(method='post', action='/devices/#{device.id}/credentials/send')
               button.pull-right.btn.btn-white(type='submit', value="delete") Mail
             a.pull-right.btn.btn-white(href="/devices/#{device.id}/credentials/download") Download
+            a.pull-right.btn.btn-white(href="owntracks:///hosted?user=#{user.username}&device=#{device.devicename}&token=#{deviceToken.plain}") Open App
           .clearfix
 
