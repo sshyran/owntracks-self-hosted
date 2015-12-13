@@ -1,5 +1,6 @@
 # Config
 config.json
+api/config.json
 ._*
 
 # Logs
