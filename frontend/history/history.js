@@ -36,9 +36,9 @@ angular.module( 'sample.history', [
 
 
 
-	API.get(API.endpoints.devices).then(function(data) {
+	API.get(API.endpoints.devices).then(function(response) {
 
-		$scope.devices = data;
+		$scope.devices = response.data;
     }, function(error) {
 		console.log(error);
     });
@@ -175,8 +175,8 @@ angular.module( 'sample.history', [
 	}
 	
 	queryHistory = function(fromTo) {
-		return API.get(API.endpoints.deviceHistory, {pathParams: {deviceId: $scope.device.id}, params: fromTo}).then(function(res) {
-			$scope.records = (res && res.count > 0) ? res.locations : undefined
+		return API.get(API.endpoints.deviceHistory, {pathParams: {deviceId: $scope.device.id}, params: fromTo}).then(function(response) {
+			$scope.records = (response.data && response.data.count > 0) ? response.data.locations : undefined
 
 			
 			var markerArray = [];

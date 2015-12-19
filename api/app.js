@@ -6,8 +6,6 @@ var router = express.Router();
 var path = require('path');
 var favicon = require('serve-favicon');
 var bodyParser = require('body-parser');
-var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy;
 var expressJwt = require('express-jwt');
 var jwt = require('jsonwebtoken');
 var errorHandler = require('express-error-middleware');
@@ -35,7 +33,7 @@ resError = function(res, message, status) {
 resData = function(res, data, status) {
   res.type('application/json'); 
   res.status(status || 200);
-  return res.json(data)
+  return res.json({status: status || 200, data: data})
 }
 
 resAccessDenied = function(res) {
@@ -54,52 +52,37 @@ function HttpError(message, code) {
 HttpError.prototype = Error.prototype;
 
 getToken = function(req) {
- if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
-        return req.headers.authorization.split(' ')[1];
-    } else if (req.query && req.query.token) {
-        console.log("getting token from query"); 
-      return req.query.token;
-    }
-    return null;
+	if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
+		return req.headers.authorization.split(' ')[1];
+	} else if (req.query && req.query.token) {
+		return req.query.token;
+	}
+	return null;
 }
 
 requireAuth = function() {
-  return expressJwt({secret: config.session.jwtAccessSecret, requestProperty: 'jwt', credentialsRequired: true ,getToken: getToken}); 
+	return expressJwt({secret: config.session.jwtAccessSecret, requestProperty: 'jwt', credentialsRequired: true ,getToken: getToken}); 
 }
 
 signAccessToken = function(user, decodedRefreshToken){
-     return jwt.sign({
-       refreshTokenId: decodedRefreshToken.id,
-       userId: user.id,
-       isAdmin: user.isAdmin(),
-       username: user.username
-     }, config.session.jwtAccessSecret, {expiresIn: 7200})
+	return jwt.sign({
+		refreshTokenId: decodedRefreshToken.id,
+		userId: user.id,
+		isAdmin: user.isAdmin(),
+		username: user.username
+	}, config.session.jwtAccessSecret, {expiresIn: 7200})
 }
 
-signRefreshToken = function(user, decodedRefreshToken) {
-    return jwt.sign({
-       username: user.username,
-       userId: user.id,
-       email: user.email,
-       tokenId: decodedRefreshToken.id,
-       isAdmin: user.isAdmin(),
-       secret: decodedRefreshToken.secret
-     }, config.session.jwtRefreshSecret, {})
+signRefreshToken = function(user, session) {
+	return jwt.sign({
+		username: user.username,
+		userId: user.id,
+		email: user.email,
+		sessionId: session.id,
+		isAdmin: user.isAdmin(),
+		secret: session.secret
+	}, config.session.jwtRefreshSecret, {})
 }
-
-authCallback = function(req, res, next, err, user) {
-        if(!user || err) {
-                app.logWarning("primary auth failure for user: " + err);
-                return resAccessDenied(res, "login failed")
-        }
-        return user.addRefreshToken(req.type || "unkown").then(function(refreshToken){
-                return resData(res, {"refreshToken": signRefreshToken(user, refreshToken)});
-        });
-}
-
-
-
-
 
 require('./backend/logger.js')(app);
 require('./backend/db.js')(app);
@@ -110,46 +93,13 @@ require('./backend/slack.js')(app);
 console.log = app.log;
 console.error = app.logError 
 
-var tempUsers = {tt:{}, fb:{}};
-
-// Setup session and login
-app.use(passport.initialize());
-app.use(passport.session());
-passport.use(new LocalStrategy(
-	function (username, password, done) {
-		console.log("auth for " + username); 
-		return app.db.models.User.findByUsername(username).then(function (user) {
-			if (!user) {
-				console.log("user not found"); 
-				return done(username +" not found", false);
-			}
-			return user.authenticate(password, done);
-		}).catch (function (error) {
-			return done(error, false);
-		});
-	}
-));
-
-passport.serializeUser(function (user, done) {
-	done(null, user.id);
-});
-
-passport.deserializeUser(function (id, done) {
-	return app.db.models.User.findById(id).then(function (user) {
-		if (user)
-			done(null, user);
-	}).catch (function (error) {
-		done(error, null);
-	})
-});
-
-app.post('/api/v1/register', function (req, res, next) {
+app.post('/api/v1/users', function (req, res, next) {
 	var username = req.body.username;
 	var fullname = req.body.fullname;
 	var email = req.body.email;
 	var password = req.body.password;
 
-	if (!username || !password || !devicename || !email | !fullname) {
+	if (!username || !password || !email) {
 		return resError(res, "a required attribute was missing", 400);
 	}
 
@@ -165,7 +115,7 @@ app.post('/api/v1/register', function (req, res, next) {
 		password : password,
 		fullname: fullname
 	}).then(function(){
-		return resData(res "registration successfull"); 
+		return resData(res, "registration successfull"); 
 	}).catch (next);
 });
 
@@ -180,11 +130,11 @@ app.post('/api/v1/authenticate/refresh', function(req, res, next) {
 
 	jwt.verify(refreshToken, config.session.jwtRefreshSecret, function(err, decodedRefreshToken) {
                 if(err) {
-			app.logError(err);
+			pp.logError(err);
 			return resError(res, "invalid refresh token", 401)
   		}
 		console.log(decodedRefreshToken);
-		return app.db.models.Token.findOne({where: {id: decodedRefreshToken.tokenId, secret: decodedRefreshToken.secret}}).then(function(token) {
+		return app.db.models.Session.findOne({where: {id: decodedRefreshToken.sessionId, secret: decodedRefreshToken.secret}}).then(function(token) {
 			if(!token) {
 				app.logError("token not found in db"); 
 				throw new HttpError("the provided token has been revoked",401)
@@ -203,24 +153,33 @@ app.post('/api/v1/authenticate/refresh', function(req, res, next) {
         });
 })
 
-
-app.get('/api/v1/authenticate/test', requireAuth(), function(req, res, next) {
-	var token = getToken(req); 
-	if(!token)
-		return resError(res, "unable to verify token");
-
-        jwt.verify(token, config.session.jwtAccessSecret, function(err, decoded) {
-		if(err)
-			return resError(res, "unable to verify token");
-		return resData(res, {"token": decoded}); 
-	});
- 
-        //return passport.authenticate('local', function(err, user) {return authCallback(req, res, next, err, user)})(req, res, next);
-});
-
 app.post('/api/v1/authenticate', function(req, res, next) {
+	if(!req.body.username || !req.body.password)
+		return resBadRequest(res);
+
+
+	var clientType = req.body.clientType; 
+	if(clientType != "mobile" || clientType != "web")
+		clientType = "generic"; 
+
 	console.log("local authentication for user: " + req.body.username); 
-	return passport.authenticate('local', function(err, user) {return authCallback(req, res, next, err, user)})(req, res, next); 
+	
+        return app.db.models.User.findByUsername(req.body.username).then(function (user) {
+		if(!user)
+			throw new HttpError("invalid username or password", 422)
+
+		console.log("user found");
+		if(user.authenticate(req.body.password)) {
+                        var secret = crypto.randomBytes(24).toString('hex');
+
+			return app.db.models.Session.create({userId: user.id, secret: secret, type: clientType}).then(function(session) {
+                		return resData(res, {"refreshToken": signRefreshToken(user, session)});
+			})
+		} else {
+			throw new HttpError("invalid username or password", 422)	
+		}
+
+	}).catch(next);
 });
 
 app.get('/api/v1/users', requireAuth(), function(req, res) {
@@ -354,7 +313,7 @@ app.get('/api/v1/users/:userId/devices/:deviceId/history', requireAuth(), functi
   });
 });
 
-app.post('/api/v1/users/:userId/devices', requireAuth(), function(req, res) {
+app.post('/api/v1/users/:userId/devices', requireAuth(), function(req, res, next) {
         if (!req.params.userId || _.isEmpty(req.body.devicename)) {
     		return resBadRequest(res);
 	}
@@ -371,7 +330,7 @@ app.post('/api/v1/users/:userId/devices', requireAuth(), function(req, res) {
   		var user; 
 		return app.db.models.User.findOne({where: {id: req.params.userId}, attributes: ["id", "username" ]}).then(function(u) {
     			if(!u)
-				throw new Error("the user could not be found");
+				throw new HttpError("the user could not be found", 404);
 		
 			user = u; 
 			return app.db.models.Device.create({
@@ -388,7 +347,7 @@ app.post('/api/v1/users/:userId/devices', requireAuth(), function(req, res) {
 
 			return app.db.models.Permission.create({
 				userId: user.id, 
-				username: device.username, 
+				username: user.username, 
 				deviceId: device.id, 
 				shareId: null, 
 				topic: device.getRWTopic(user), 
@@ -396,22 +355,14 @@ app.post('/api/v1/users/:userId/devices', requireAuth(), function(req, res) {
                  }).then(function(){
 			return d; 
                  })
-        }).then(function(d) {
-                d.updatedAt = device.updatedAt;
-		return resData(res, d);
-	}).catch (function (error) {
-                if(error.name === "SequelizeUniqueConstraintError") {
-                        return resError(res, "the device already exists", 409);
-                }else {
-                        app.logError(error);
-                        return resError(res, "the device could not be created", 500); 
-                }
-        })
+        }).then(function(device) {
+		return resData(res, device, 201);
+	}).catch (next)
 })
 
 
 
-app.patch('/api/v1/users/:userId/devices/:deviceId/credentials', requireAuth(), function(req, res) {
+app.put('/api/v1/users/:userId/devices/:deviceId', requireAuth(), function(req, res) {
         if (!req.params.userId || !req.params.deviceId) {
                 return resBadRequest(res);
         }
@@ -581,7 +532,7 @@ app.get('/api/v1/users/:userId/trackings', requireAuth(), function (req, res) {
 
 })
 
-app.get('/api/v1/users/:userId', requireAuth(), function (req, res) {
+app.get('/api/v1/users/:userId', requireAuth(), function (req, res, next) {
 
   if(!req.params.userId || !(req.params.userId == req.jwt.userId || req.jwt.isAdmin) ) {
     return resError(res, "user not found");
@@ -591,10 +542,23 @@ app.get('/api/v1/users/:userId', requireAuth(), function (req, res) {
     if(!user)
     	throw new HttpError("user not found", 404);
     return resData(res, user);
-  }).catch(function(error) {
-    return resError(res, error);
-  })
+  }).catch(next);
+});
+
+app.get('/api/v1/users/:userId/sessions', requireAuth(), function(req, res, next) {
+  if(!req.params.userId)
+    return resBadRequest(res);
+
+
+  if(req.jwt.userId != req.params.userId && !req.jwt.isAdmin)
+    return resAccessDenied(res);
+
+  app.db.models.Session.findAll({where: {userId: req.params.userId}, attributes: ['id', 'type', 'createdAt', 'updatedAt']}).then(function(tokens){
+	return resData(res, tokens); 
+  }).catch(next); 
+
 })
+
 
 
 //app.use(errorHandler.NotFoundMiddleware); // if a request is not handled before this a NotFoundError will be sent into next 
@@ -608,9 +572,11 @@ app.use(function (err, req, res, next) {
   if(err.name === 'HttpError')
     return resError(res, err.message, err.code);
 
-  if(err.name === 'UnauthorizedError') 
-    return resError(res, 'access token has expired', 419)
+  if(err.name === 'UnauthorizedError')
+    return resError(res, 'access token has expired', 403)
 
+  if(err.name === 'SequelizeUniqueConstraintError')
+    return resError(res, 'already exists', 409)
   
   app.logError(err);
   return resError(res); 

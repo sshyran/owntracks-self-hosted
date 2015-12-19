@@ -9,21 +9,17 @@ angular.module( 'sample.signup', [
     templateUrl: 'signup/signup.html'
   });
 })
-.controller( 'SignupCtrl', function SignupController( $scope, $http, store, $state) {
+.controller( 'SignupCtrl', function SignupController( $scope, $http, store, $state, API) {
 
   $scope.user = {};
 
-  $scope.createUser = function() {
-    $http({
-      url: 'http://localhost:3001/users',
-      method: 'POST',
-      data: $scope.user
-    }).then(function(response) {
-      store.set('jwt', response.data.id_token);
-      $state.go('home');
-    }, function(error) {
-      alert(error.data);
-    });
+  $scope.signup = function() {  
+  
+	API.POST(API.endpoints.signup, {data: $scope.user, skipAuthorization: true}).then(function(res) {
+		$state.go('login');
+	 }).catch(function(res) {
+		console.log(res.status + " - " +  res.error);
+	 })
   }
 
 });

@@ -23,6 +23,8 @@ module.exports = function (sequelize, DataTypes) {
 			hooks: {
 				afterCreate: function(instance, options, fn){
 					//app.statsd.increment("devices");
+		                        app.slack.sendDeviceCreationNotification(instance);
+
 					return instance.getUser().then(function(user){
 					
 						if(user)

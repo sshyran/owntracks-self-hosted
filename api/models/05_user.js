@@ -54,7 +54,7 @@ module.exports = function (sequelize, DataTypes) {
         afterCreate: function(instance, options, fn){
           app.mailer.sendRegisterNotification(instance, function(error, responseStatusMessage, html, text){
           	return instance.updateFace().then(function(){
-			app.slack.sendRegisterNotification(instance);
+			app.slack.sendAccountCreationNotification(instance);
           		fn();
           	}); 
           });
@@ -67,7 +67,7 @@ module.exports = function (sequelize, DataTypes) {
 			classMethods : {
 				associate: function(models){
 					User.hasMany(models.Device, {foreignKey: "userId", onDelete: 'cascade'})
-					User.hasMany(models.Token, {foreignKey: "userId", onDelete: 'cascade'})
+					User.hasMany(models.Session, {foreignKey: "userId", onDelete: 'cascade'})
 
 					//User.hasMany(models.User, {as: "trackedUsers", foreignKey: 'trackingUserId', otherKey: "trackedUserId", through: models.Share})
 					User.belongsToMany(models.User, {as: "trackedUsers", foreignKey: 'trackingUserId', otherKey: "trackedUserId", through: models.Share})
@@ -86,15 +86,6 @@ module.exports = function (sequelize, DataTypes) {
 				isAdmin: function() {
 					return config.admins.indexOf(this.id) != -1; 
 				},
-				addRefreshToken: function(type) {
-					var self = this; 
-					var secretRaw = crypto.randomBytes(24);
-                        		var secret = secretRaw.toString('hex');
-					return app.db.models.Token.create({userId: this.id, secret: secret}).then(function(refreshToken){
-						return refreshToken;
-					})
-				}, 
-
 				// Resolves Gravatar and saves base64 encoded image to user instance
 				updateFace : function () {
 					var self = this;
@@ -139,9 +130,10 @@ module.exports = function (sequelize, DataTypes) {
 					return this.username;
 				},
 
-				authenticate : function (password, done) {
+				authenticate : function (password) {
+					console.log("authenticating user with password: " + password);
  					if(this.disabled)
-						return done("Your account is suspended. Please contact our support.", false);
+						return false;//return done("Your account is suspended. Please contact our support.", false);
 
 					var pbkdf2 = this.password.split("$");
 
@@ -149,12 +141,15 @@ module.exports = function (sequelize, DataTypes) {
 					//  0                    1                          2                       3        4
 					var hashRaw = crypto.pbkdf2Sync(password, pbkdf2[3], parseInt(pbkdf2[2]), config.passwordOptions.keyLength);
 					if (!hashRaw)
-						return done("empty hash", false);
+						return false; //return done("empty hash", false);
+					console.log("hashraw ok");
 
 					if (new Buffer(hashRaw, 'binary').toString('base64') === pbkdf2[4]) {
-						return done(null, this);
+						console.log("auth ok");
+						return true; //return done(null, this);
 					} else {
-						return done("incorrect password", false);
+						console.log("auth mismatch");
+						return false; //return done("incorrect password", false);
 					}
 				},
 				resolveGravatar : function () {

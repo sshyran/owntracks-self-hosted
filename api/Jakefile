@@ -7,7 +7,7 @@ task('default', [], function () {
   console.log('This is the default task.');
 });
 
-namespace('traction', function () {
+namespace('hosted', function () {
 	task('install', ["db:init"], function () {	  
 		console.log(">> running traction:install");
 	})
@@ -31,7 +31,13 @@ namespace('traction', function () {
 				// It can safely be dropped as the new index includes all components in the same order to maintain foreign key integrity
 				console.log("Fixing indices of Shares table");
 				return app.db.connection.query("DROP INDEX `Shares_trackedUserId_trackingUserId_unique` on `Shares`");
+			}).then(function() {
+				return app.db.connection.query("SET GLOBAL event_scheduler = ON; CREATE EVENT IF NOT EXISTS `cleanSessions` ON SCHEDULE EVERY 1 DAY COMMENT 'Cleans up expired sessions' DO BEGIN DELETE FROM Sessions WHERE updatedAt < DATE_SUB(NOW(), INTERVAL 30 DAY); END;");
+		
+
 			}).catch(function(error) { 
+
+
 				console.error("error: " + error); 
 			});
 		});

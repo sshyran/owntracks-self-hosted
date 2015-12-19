@@ -1,7 +1,7 @@
 module.exports = function (sequelize, DataTypes) {
 	var app = sequelize.app; 
 
-	var Token = sequelize.define('Token', 
+	var Session = sequelize.define('Session', 
 		{
 			id: {
 				type: DataTypes.INTEGER,
@@ -9,6 +9,11 @@ module.exports = function (sequelize, DataTypes) {
 	      			primaryKey: true
 			},
 			secret: {type: DataTypes.STRING, allowNull: false},
+			type: {
+				type: DataTypes.ENUM,
+				values: ['generic', 'mobile', 'web'],
+				defaultValue: 'generic'	
+			}
 
 		}, {
 
@@ -17,11 +22,11 @@ module.exports = function (sequelize, DataTypes) {
 			},
 			classMethods : {
 				associate: function(models){
-					Token.belongsTo(models.User, {foreignKey: 'userId'});
+					Session.belongsTo(models.User, {foreignKey: 'userId'});
 				}
 			}
 		}
 	);
-	return Token; 
+	return Session; 
 }
 

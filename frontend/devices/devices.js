@@ -21,8 +21,8 @@ angular.module( 'sample.devices', [
   }
 
 
-  API.get(API.endpoints.devices, {params: {last: true}}).then(function(data) {
-		$scope.devices = data
+  API.get(API.endpoints.devices, {params: {last: true}}).then(function(response) {
+		$scope.devices = response.data;
     }, function(error) {
 		console.log(error);
     });

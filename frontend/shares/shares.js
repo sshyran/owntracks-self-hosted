@@ -60,7 +60,7 @@ angular.module( 'sample.shares', [
 	$scope.addTracker = function() {
 		$scope.formData = {};
 
-        var dialog = ngDialog.open({ template: 'shares/addTracker.html', showClose: false, closeByEscape: true, closeByDocument: true, overlay: true, scope:  $scope});
+        var dialog = ngDialog.open({ template: 'shares/add.html', showClose: false, closeByEscape: true, closeByDocument: true, overlay: true, scope:  $scope});
 		API.GET(API.endpoints.devices).then(function(data) {
 			$scope.devices = data;
 		}, function(error) {

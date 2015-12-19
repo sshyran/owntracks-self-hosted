@@ -27,9 +27,6 @@ angular.module('angular-jwt',
     this.$get = ["$q", "$injector", "$rootScope", function ($q, $injector, $rootScope) {
       return {
         request: function (request) {
-		console.log("request intercepted for url: " + request.url)
-				console.log("request.skipAuthorization: " + request.skipAuthorization)
-
           if (request.skipAuthorization) {
             return request;
           }

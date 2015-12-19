@@ -4,6 +4,7 @@ angular.module( 'sample', [
   'sample.history',
   'sample.login',
   'sample.signup',
+  'sample.account',
   'angular-storage',
   'angular-jwt',
   'angular-loading-bar',
@@ -50,7 +51,6 @@ angular.module( 'sample', [
 	$rootScope.$on('loggedIn', function(event, args) {
 		updateUserArea();
 	});
-	
 
 	
 	var updateUserArea = function() {
@@ -62,6 +62,8 @@ angular.module( 'sample', [
 		});
 	}
 	
+
+	
 	if(AuthenticationService.loggedIn)
 		updateUserArea();
 
@@ -69,7 +71,9 @@ angular.module( 'sample', [
 		AuthenticationService.logout();	
 	}
 	
-	
+	$scope.showAccount = function() {
+		AuthenticationService.logout();	
+	}
 })
 .factory( 'AuthenticationService', function($rootScope, $http, store, jwtHelper, $q) {
 	var authService = {loggedIn: false};
@@ -114,7 +118,7 @@ angular.module( 'sample', [
 			data: credentials,
 			skipAuthorization: true
 		}).then(function(response) {
-			login(response.data.refreshToken)
+			login(response.data.data.refreshToken)
 		})
 	}
 	
@@ -168,7 +172,7 @@ angular.module( 'sample', [
 			}).then(function(response) {
 				console.log("response for refresh token: "); 
 				console.log(response);
-				var id_token = response.data.accessToken;
+				var id_token = response.data.data.accessToken;
 				if(!id_token)
 					  return;
 				  
@@ -200,26 +204,25 @@ angular.module( 'sample', [
 
     var baseApiUrl = 'https://hosted-dev.owntracks.org/api/v1/',
     endpoints = {
+		signup: baseApiUrl + 'users',
         users : baseApiUrl + 'users',
         user: baseApiUrl + 'users/:userId',
         devices: baseApiUrl + 'users/:userId/devices',
         device: baseApiUrl + 'users/:userId/devices/:deviceId',
         deviceHistory: baseApiUrl + 'users/:userId/devices/:deviceId/history',
         deviceHistoryExport: baseApiUrl + 'users/:userId/devices/:deviceId/history/export',
-        trackers: baseApiUrl + 'users/:userId/trackers',
-		tracker: baseApiUrl + 'users/:userId/trackers/:trackerId',
-        trackings: baseApiUrl + 'users/:userId/trackings',
-        tracking: baseApiUrl + 'users/:userId/trackings/:trackingId',
         shares: baseApiUrl + 'users/:userId/shares',
         share: baseApiUrl + 'users/:userId/shares/:shareId',
+        sessions: baseApiUrl + 'users/:userId/sessions',
+        session: baseApiUrl + 'users/:userId/sessions/:sessionId',
 
     };
 
-    function fillUrl(urlFormat, pathParams) {
+    function fillUrl(urlFormat, pathParams, options) {
         var url = urlFormat;
 
 	var params = pathParams || {};
-	if(!params.userId) {
+	if(!options.skipAuthorization && !params.userId) {
 		params.userId = AuthenticationService.currentUser.userId;
         }
 
@@ -240,11 +243,11 @@ angular.module( 'sample', [
 		if(!options)
 			options = {}
 
-		var url = fillUrl(endpoint, options.pathParams); 
+		var url = fillUrl(endpoint, options.pathParams, options); 
 		console.log("running API query to endpoint: " + url);
 
 		var d = $q.defer();
-		$http({url: url, method: method || 'GET', data: options.data, params: options.params}).success(function(data){
+		$http({url: url, method: method || 'GET', data: options.data, params: options.params, skipAuthorization: options.skipAuthorization || false}).success(function(data){
 			return d.resolve(data);
 		}).error(function(error){
 			return d.reject(error);

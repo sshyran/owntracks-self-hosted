@@ -15,6 +15,7 @@ angular.module( 'sample.login', [
   $scope.user = {};
 
   $scope.login = function() {
+	$scope.user.clientType = "web";
 	 AuthenticationService.login($scope.user).then(function() {
 	 		$state.go('devices');
 	 }).catch(function(error) {
