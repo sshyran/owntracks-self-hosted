@@ -110,11 +110,10 @@ User related resources.
 
 ### Create a user [POST]
 + Attributes
-    + username: johndoe (string) - foo
-    + fullname: John Doe (string) - foo
-    + email: john@example.com (string) - Email address of the user
-    + password: passw0rd (string) - Email address of the user
-    + photo: ... (string) - Base64 encoded user image
+    + username: johndoe (required, string) - foo
+    + fullname: John Doe (required, string) - foo
+    + email: john@example.com (required, string) - Email address of the user
+    + password: passw0rd (required, string) - Email address of the user
 
 + Request (application/json)
 
@@ -136,10 +135,9 @@ User related resources.
                 "username": "johndoe",
                 "fullname": "John Doe",
                 "email": "john@example.com",
-                "password": "passw0rd"
-                "photo": ""
-                "createdAt" : "", 
-                "updatedAt" : ""
+                "photo": "..."
+                "createdAt": "2015-12-18T13:25:47.000Z",
+                "updatedAt": "2015-12-18T13:25:47.000Z"
             }
         }
 + Response 409 (application/json)
@@ -177,10 +175,9 @@ User related resources.
                 "username": "johndoe",
                 "fullname": "John Doe",
                 "email": "john@example.com",
-                "password": "passw0rd"
-                "photo" : "",
-                "createdAt" : "", 
-                "updatedAt" : ""
+                "photo" : "...",
+                "createdAt": "2015-12-18T13:25:47.000Z",
+                "updatedAt": "2015-12-18T13:25:47.000Z"
             }
         }
     
