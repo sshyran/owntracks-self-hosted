@@ -14,6 +14,7 @@ angular.module( 'sample.signup', [
   $scope.user = {};
 
   $scope.signup = function() {  
+	//TODO: check password match
   
 	API.POST(API.endpoints.signup, {data: $scope.user, skipAuthorization: true}).then(function(res) {
 		$state.go('login');

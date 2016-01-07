@@ -9,7 +9,8 @@ angular.module( 'sample', [
   'angular-jwt',
   'angular-loading-bar',
   'ngDialog',
-  'vs-repeat'
+  'vs-repeat',
+  'flash'
 ])
 .config( function myAppConfig ($urlRouterProvider, jwtInterceptorProvider, $httpProvider) {
   $urlRouterProvider.otherwise('/');
@@ -55,8 +56,8 @@ angular.module( 'sample', [
 	
 	var updateUserArea = function() {
 		console.log("updateUserArea")
-		API.GET(API.endpoints.user).then(function(data) {
-			$scope.user = data
+		API.GET(API.endpoints.user).then(function(response) {
+			$scope.user = response.data;
 		}, function(error) {
 			console.log(error);
 		});
@@ -188,6 +189,14 @@ angular.module( 'sample', [
 				accessTokenRequestLock = false;
 				
 				return id_token;
+			}).catch(function(error){
+				console.log(error);
+				if(error.status == 401){
+					console.error("refresh token has expired or was revoked"); 
+				}
+				
+				authService.logout();
+				return null;
 			});
 		} else {
 			//console.log("using access token: " + idToken); 
@@ -220,6 +229,7 @@ angular.module( 'sample', [
 
     function fillUrl(urlFormat, pathParams, options) {
         var url = urlFormat;
+	console.log("fillUrl:" + urlFormat);
 
 	var params = pathParams || {};
 	if(!options.skipAuthorization && !params.userId) {

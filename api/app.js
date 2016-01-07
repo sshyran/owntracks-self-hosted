@@ -11,6 +11,10 @@ var jwt = require('jsonwebtoken');
 var errorHandler = require('express-error-middleware');
 var requestPromise = require('request-promise')
 var request = require('request')
+var validator = require('validator'); 
+validator.extend('isWhitespace', function (str) {
+    return /^\s+$/.test(str);
+});
 
 
 var crypto = require('crypto');
@@ -23,8 +27,19 @@ var _ =require('underscore');
 var app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended : false}));
+require('./backend/logger.js')(app);
+require('./backend/db.js')(app);
+require('./backend/broker.js')(app);
+require('./backend/mailer.js')(app);
+require('./backend/slack.js')(app);
+
+console.log = app.log;
+console.error = app.logError
+
+
 
 resError = function(res, message, status) {
+  app.logError("resError: " + message + " ("+status +")");
   res.type('application/json'); 
   res.status(status || 500);
   return res.json({status: (status || 500), 'error': (message || "internal server error")})
@@ -84,12 +99,6 @@ signRefreshToken = function(user, session) {
 	}, config.session.jwtRefreshSecret, {})
 }
 
-require('./backend/logger.js')(app);
-require('./backend/db.js')(app);
-require('./backend/broker.js')(app);
-require('./backend/mailer.js')(app);
-require('./backend/slack.js')(app);
-
 console.log = app.log;
 console.error = app.logError 
 
@@ -98,24 +107,40 @@ app.post('/api/v1/users', function (req, res, next) {
 	var fullname = req.body.fullname;
 	var email = req.body.email;
 	var password = req.body.password;
+	console.log(username);
+	console.log(fullname);
+	console.log(email);
+	console.log(password);
 
-	if (!username || !password || !email) {
+	if (validator.isNull(username) || validator.isNull(password) || validator.isNull(email) || validator.isNull(fullname)) {
 		return resError(res, "a required attribute was missing", 400);
 	}
 
-	if(username.match(/[^A-Za-z0-9]/)) {
-		return resError(res, "the username may only contain alphanumeric characters", 400);
+        if (validator.isWhitespace(username) || validator.isWhitespace(password) || validator.isWhitespace(email) || validator.isWhitespace(fullname)) {
+                return resError(res, "a required attribute may not be blank", 400);
+        }
+
+        if(!validator.isAlphanumeric(username)) {
+	        return resError(res, "username may only contain alphanumeric characters", 401);
 	}
 
-	var user;
+	if(!validator.isEmail(email)) {
+	        return resError(res, "email is invalid", 400);
+	}
+
+	console.log("new usename: " + username);	
+
+	//fullname = validator.stripLow(username, false);
+	fullname = validator.trim(fullname);
+
 
 	return app.db.models.User.create({
 		username : username,
 		email : email,
 		password : password,
 		fullname: fullname
-	}).then(function(){
-		return resData(res, "registration successfull"); 
+	}).then(function(u){
+		return resData(res, {id: u.id, username: u.username, fullname: u.fullname, email: u.email, photo: u.photo, createdAt: u.createdAt, updatedAt: u.updatedAt}, 201); 
 	}).catch (next);
 });
 
@@ -158,10 +183,14 @@ app.post('/api/v1/authenticate', function(req, res, next) {
 		return resBadRequest(res);
 
 
+	
 	var clientType = req.body.clientType; 
-	if(clientType != "mobile" || clientType != "web")
+	console.log("clientType: "+ clientType);
+	if(clientType != "mobile" && clientType != "web") {
 		clientType = "generic"; 
+	}
 
+	console.log("clientType: "+ clientType);
 	console.log("local authentication for user: " + req.body.username); 
 	
         return app.db.models.User.findByUsername(req.body.username).then(function (user) {
@@ -187,7 +216,7 @@ app.get('/api/v1/users', requireAuth(), function(req, res) {
     return resAccessDenied(res)
 
   return app.db.models.User.findAll({where: {not: {id: 1}}, attributes: ["id", "username", "fullname", "createdAt"], order: 'id DESC', raw: true}).then(function(users) {
-      resData(res, users);
+      resData(res, users, 200);
   });
 })
 
@@ -544,6 +573,53 @@ app.get('/api/v1/users/:userId', requireAuth(), function (req, res, next) {
     return resData(res, user);
   }).catch(next);
 });
+
+
+app.post('/api/v1/users/:userId', requireAuth(), function (req, res, next) {
+	if(!req.params.userId || !(req.params.userId == req.jwt.userId || req.jwt.isAdmin) ) {
+		return resError(res, "user not found");
+	}
+
+        var fullname = req.body.fullname;
+        var email = req.body.email;
+        var password = req.body.password;
+        var newPassword = req.body.newPassword;
+        console.log(fullname);
+        console.log(email);
+        console.log(password);
+        console.log(newPassword);
+
+	return app.db.models.User.findById(req.params.userId).then(function(user) {
+		var attributes = {};
+ 	       	if (validator.isNull(password) || validator.isWhitespace(password) || !user.authenticate(password)) {
+     			return resError(res, "the provided current password is invalid", 400);
+       		}
+
+        	if(!validator.isNull(newPassword) && !validator.isWhitespace(newPassword)) {
+                	attributes['password']=newPassword;
+        	}
+
+        	if(!validator.isNull(fullname) && !validator.isWhitespace(fullname)) {
+                	attributes['fullname']=fullname;
+        	}
+
+        	fullname = validator.trim(fullname);
+        	if(!validator.isNull(email) && !validator.isWhitespace(email) && validator.isEmail(email)) {
+                	if(!validator.isEmail(email)) {
+                        	return resError(res, "the provided email address is invalid", 400);
+                	}
+                	attributes['email']=email;
+        	}
+
+		console.log(attributes);
+       		return user.update(attributes, {where: {id: req.params.userId}, fields: Object.keys(attributes), validate: true, limit: 1}).then(function(u){
+                	return resData(res, {id: u.id, username: u.username, fullname: u.fullname, email: u.email, photo: u.photo, createdAt: u.createdAt, updatedAt: u.updated});
+		});
+	
+        }).catch (next);
+	
+});
+
 
 app.get('/api/v1/users/:userId/sessions', requireAuth(), function(req, res, next) {
   if(!req.params.userId)

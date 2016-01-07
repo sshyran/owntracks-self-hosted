@@ -24,7 +24,8 @@
     "angular-ui-router": "~0.2.11",
     "angular-bindonce": "~0.3.3",
     "angular-vs-repeat": "~1.0.0-rc9",
-    "angular-data-table": "~0.4.2"
+    "angular-data-table": "~0.4.2",
+    "angular-flash-alert": "~1.1.1"
   },
   "ignore": [
     "**/.*",

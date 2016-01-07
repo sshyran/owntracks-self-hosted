@@ -9,7 +9,7 @@
 				<span class="caret"></span>
 			</button>
 			<ul class="dropdown-menu pull-right" aria-labelledby="dropdownMenu1">
-				<li><a ng-click="Edit" >Edit</a></li>
+				<li><a ng-click="editAccount()" >Edit</a></li>
 			</ul>
 		</div>
 	</div>
@@ -19,13 +19,23 @@
 <div id="body">
 	<div class="row">
 		<div class="col-md-6 col-xs-12">
-			<div class="panel-header">
+			<div class="panel-header panel-header-outside">
 				<h3> Account details</h3>
 			</div>	
 
-			<div class="panel-default" >
+			<div class="panel-default panel-header-outside" >
 				<div class="panel-body">
-					Body
+					<dl class="dl-horizontal">
+					  <dt>Username</dt>
+					  <dd>{{user.username}}</dd>
+					  <dt>ID</dt>
+					  <dd>{{user.id}}</dd>
+					  <dt>Fullname</dt>
+					  <dd>{{user.fullname}}</dd>
+					  <dt>Email</dt>
+					  <dd>{{user.email}}</dd>
+
+					</dl>
 				</div>			
 			</div>
 		</div>

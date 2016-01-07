@@ -400,6 +400,14 @@ padding: 30px;
 	margin-bottom: 0;
 }
 
+#main .panel-default.panel-header-outside {
+	margin-top: 0;
+}  
+
+.panel-default .panel-body *:last-child {
+	margin-bottom: 0; 
+}
+
 .input-group {
 	margin-bottom: 15px;
 	width: 100%;

@@ -17,27 +17,12 @@ angular.module( 'sample.shares', [
 .controller( 'SharesCtrl', function DevicesController( $scope, API, ngDialog) {
 	var controller = this; 
 	API.GET(API.endpoints.shares).then(function(data) {
-		$scope.shares = data
+		$scope.shares = data.data
     }, function(error) {
 		console.log(error);
     });
 	
 	
-
-
-	
-//	API.GET(API.endpoints.trackers).then(function(data) {
-//		$scope.trackers = data
- //   }, function(error) {
-//		console.log(error);
- //   });
-	
-	API.GET(API.endpoints.trackings).then(function(data) {
-		$scope.trackings = data
-	}, function(error) {
-		console.log(error);
-	});
-
 	$scope.deleteTracking = function(id) {
 		
 	}
@@ -90,13 +75,4 @@ angular.module( 'sample.shares', [
 
 
 
-}).controller('SampleModalController', function($scope, close) {
-  console.log("sample controller startet")
-
- $scope.dismissModal = function(result) {
-	console.log("dismissmodal")
-    close(result, 200); // close, but give 200ms for bootstrap to animate
- };
-
 });
-;
