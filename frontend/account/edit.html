@@ -1,16 +1,19 @@
-<div flash-message="5000" ></div> 
+<div id="flash-account-edit" flash-alert active-class="in alert" class="fade">
+    <span class="alert-message">{{flash.message}}</span>
+</div>
 
-<h1 class="formTitle">Edit your account</h1>
+<h1 class="formTitle">Account settings</h1>
 <p class="formExplanation">To edit your account details or to set a new password, change the fields below and enter your current password  </p>
 
 
 
 <form  ng-submit="saveAccount()" role="form" class="form-horizontal clearfix">
+
 	<div class="input-group">
-		<input ng-model="formData.fullname" id="fullname" ng-init="formData.fullname = user.fullname" type="text" name="fullname" placeholder="Fullname" autofocus required class="form-control"  />
+		<input ng-model="formData.fullname" id="fullname" ng-init="formData.fullname = AuthenticationService.currentUser.fullname" type="text" name="fullname" placeholder="Fullname" autofocus required class="form-control"  />
 	</div>
 	<div class="input-group">
-		<input ng-model="formData.email" id="email" ng-init="formData.email = user.email" type="text" name="text" placeholder="Email" required class="form-control"  >
+		<input ng-model="formData.email" id="email" ng-init="formData.email = AuthenticationService.currentUser.email" type="text" name="text" placeholder="Email" required class="form-control"  >
 	</div>
 	
 	<div class="input-group">

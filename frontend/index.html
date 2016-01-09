@@ -32,7 +32,7 @@
 	<script type='text/javascript' src='vendor/angular-vs-repeat/src/angular-vs-repeat.min.js'></script>
 	<script type='text/javascript' src='vendor/pikaday/pikaday.js'></script>
 	<script type='text/javascript' src="vendor/ng-dialog/js/ngDialog.min.js"></script>
-	<script type='text/javascript' src="vendor/angular-flash-alert/dist/angular-flash.min.js"></script>
+	<script type='text/javascript' src="vendor/angular-flash/dist/angular-flash.min.js"></script>
 
 
 	
@@ -76,11 +76,11 @@
 
 						<a class="dropdown-toggle" data-toggle="dropdown" href="#">
 							<!--<img id="account-photo" src="data:image/png;base64,{{user.photo}}" class="img-circle" ng-if="user"/>-->
-							<span id="account-name">{{user.fullname || user.username || AuthenticationService.currentUser.username}}</span>
+							<span id="account-name">{{AuthenticationService.currentUser.fullname || AuthenticationService.currentUser.username}}</span>
 						</a>
 						<ul class="dropdown-menu pull-right ">
 							<li>
-								<a href="#/account">Account</a>
+								<a ng-click="editAccount()">Account</a>
 							</li>
 							<li>
 								<a href="#" ng-click="logout()" >Logout</a>

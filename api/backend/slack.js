@@ -56,5 +56,17 @@ module.exports = function(app) {
         }
 
 
+
+        app.slack.sendAppStartedNotification = function(device) {
+                return;
+                slack.send({
+                        username: 'HostedBot',
+                        text: "API application has restarted",
+                        channel: "#infra",
+                        unfurl_links: 1,
+                        icon_emoji: ':bust_in_silhouette:'
+                });
+        }
+
 }
 

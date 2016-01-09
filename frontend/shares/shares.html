@@ -36,6 +36,12 @@
 					</tr>
 				</thead>
 				<tbody>
+					<tr class="placeholder" ng-if="shares.length == 0">
+							<td>You haven't shared any devices yet</td>
+							<td></td>
+							<td></td>
+					</tr>
+
 					<tr ng-repeat="share in shares | filter: {from: {id: AuthenticationService.currentUser.userId}}">
 
 						<td class="username" >
@@ -81,6 +87,11 @@
 					</tr>
 				</thead>
 				<tbody>
+					<tr class="placeholder" ng-if="shares.length == 0">
+							<td>Nobody has shared any devices with you yet</td>
+							<td></td>
+							<td></td>
+					</tr>
 					<tr ng-repeat="share in shares | filter: {to: {id: AuthenticationService.currentUser.userId}}">
 
 						<td class="username" >

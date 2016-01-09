@@ -10,10 +10,13 @@ angular.module( 'sample', [
   'angular-loading-bar',
   'ngDialog',
   'vs-repeat',
-  'flash'
+  'angular-flash.service', 
+  'angular-flash.flash-alert-directive'
 ])
-.config( function myAppConfig ($urlRouterProvider, jwtInterceptorProvider, $httpProvider) {
+.config( function myAppConfig ($urlRouterProvider, jwtInterceptorProvider, $httpProvider, flashProvider) {
   $urlRouterProvider.otherwise('/');
+  $urlRouterProvider.when('/', '/devices');
+
 
   jwtInterceptorProvider.tokenGetter = ['AuthenticationService', 'config', function(AuthenticationService, config) {
 	if (config.url.substr(config.url.length - 5) == '.html') {
@@ -24,6 +27,15 @@ angular.module( 'sample', [
 
   }];
   $httpProvider.interceptors.push('jwtInterceptor');
+  
+  
+	flashProvider.errorClassnames.push('alert-danger');
+	flashProvider.warnClassnames.push('alert-warning');
+	flashProvider.infoClassnames.push('alert-info');
+	flashProvider.successClassnames.push('alert-success');
+
+
+
 }).run(function($rootScope, $state, store, AuthenticationService) {
 
 	$rootScope.$on('$stateChangeStart', function (e, to) {
@@ -38,60 +50,101 @@ angular.module( 'sample', [
 
 	$rootScope.$on('loggedOut', function(event, args) {
 		$state.go('login');	
+				flash.success = 'Your session has expired due to updated credentials. Please login again.';
+
 	});
 	
 })
-.controller( 'AppCtrl', function AppCtrl ($rootScope, $state, $scope, $location, AuthenticationService, API) {
-	$scope.AuthenticationService = AuthenticationService
+.controller( 'AppCtrl', function AppCtrl ($rootScope, $state, $scope, $location, AuthenticationService, API, ngDialog, flash) {
+	$rootScope.AuthenticationService = AuthenticationService
 	$scope.$on('$routeChangeSuccess', function(e, nextRoute){
 		if ( nextRoute.$$route && angular.isDefined( nextRoute.$$route.pageTitle ) ) {
 		  $scope.pageTitle = nextRoute.$$route.pageTitle + ' | ngEurope Sample' ;
 		}
 	});
-
-	$rootScope.$on('loggedIn', function(event, args) {
-		updateUserArea();
-	});
-
 	
-	var updateUserArea = function() {
-		console.log("updateUserArea")
-		API.GET(API.endpoints.user).then(function(response) {
-			$scope.user = response.data;
-		}, function(error) {
-			console.log(error);
-		});
-	}
-	
-
-	
-	if(AuthenticationService.loggedIn)
-		updateUserArea();
-
 	$scope.logout = function() {
-		AuthenticationService.logout();	
+		AuthenticationService.logoutReasonManual();	
 	}
 	
-	$scope.showAccount = function() {
-		AuthenticationService.logout();	
-	}
-})
-.factory( 'AuthenticationService', function($rootScope, $http, store, jwtHelper, $q) {
-	var authService = {loggedIn: false};
-	setUser = function(refreshToken){
-			if(refreshToken == null)
-				return console.error("User is not logged in yet")
-			
-			authService.currentUser = jwtHelper.decodeToken(refreshToken); 		
-			authService.loggedIn = true; 
-			console.log("loggedIn")
-			$rootScope.$broadcast('loggedIn');
 
-	};
+	$scope.editAccount = function() {
+		$scope.formData = {};
+
+		
+        var dialog = ngDialog.open({ template: 'account/edit.html', showClose: false, closeByEscape: true, closeByDocument: true, overlay: true, scope:  $scope});
+			
+		dialog.closePromise.then(function(data) {
+
+		})
+    };
+
+	$scope.saveAccount = function() {
+		console.log($scope.formData); 
+		if(!$scope.formData.fullname) {
+			flash.to('flash-account-edit').error = 'Please your name';
+			return; 
+		}
+		
+		if(!$scope.formData.password) {
+			flash.to('flash-account-edit').error = 'Please provide your current password';
+			return; 
+		}
+
+
+		if($scope.formData.newPassword && ($scope.formData.newPassword != $scope.formData.newPasswordRepeat)) {
+			flash.to('flash-account-edit').error = 'New passwords do not match';
+			return; 
+		}
+
+		API.POST(API.endpoints.user, {data: $scope.formData}).then(function(response) {
+			ngDialog.closeAll();
+			if($scope.formData.newPassword) { // Password changed, token has been invalidated. Login again 
+				AuthenticationService.logoutReasonPasswordChange(); 
+			} else { // Non password data has been updated, refresh user details with new data 
+				AuthenticationService.setUser(response.data); 
+				flash.success = 'Account updated successfully';
+
+			}
+		}, function(error){
+
+			console.error(error);
+			if(error.status == 409) {
+				flash.to('flash-account-edit').error = 'The specified email address is already taken';
+				return; 
+			}
+			if(error.status == 401) {
+				flash.to('flash-account-edit').error = 'The provided current password is invalid';
+				return; 
+			}
+			if(error.status == 400) {
+				flash.to('flash-account-edit').error = 'Account details could not be updated due to an invalid request';
+				return; 
+			}
+			
+			
+			flash.to('flash-account-edit').error = 'Account details could not be updated';
+			
+		})	
+	}
 	
+	
+	
+})
+.factory( 'AuthenticationService', function($rootScope, $http, store, jwtHelper, $q, flash) {
+	var authService = {loggedIn: false, refreshTokenInformation: {}, accessTokenInformation: undefined};
+	var decodedRefreshToken; 
+
+	authService.setUser = function(user) {
+		authService.currentUser = user; 
+		$rootScope.$broadcast('currentUserUpdated');
+		console.log(authService.currentUser)
+	}
+
 	getRefreshToken = function() { 
 		return store.get('refreshToken')
 	}
+	
 	
 	setRefreshToken = function(refreshToken) {
 		store.set('refreshToken', refreshToken);
@@ -101,17 +154,27 @@ angular.module( 'sample', [
 		return getRefreshToken() != null
 	}
 	
-	login = function(refreshToken) {
+	loginWithToken = function(refreshToken) {
 		setRefreshToken(refreshToken);
-		setUser(refreshToken);
-	}
-	getUser = function() { return currentUser; },
-	getUserId = function() { return currentUser.userId; }
+		authService.refreshTokenInformation = jwtHelper.decodeToken(refreshToken);
+		authService.loggedIn = true; 
+		console.log("logged in");
+		$rootScope.$broadcast('loggedIn');
 
-	if(hasRefreshToken()) {
-		setUser(getRefreshToken());			
-	} 
+		return $http({
+			url: 'https://hosted-dev.owntracks.org/api/v1/users/'+authService.getCurrentUserId(),
+			method: 'GET',
+			skipAuthorization: false
+		}).then(function(response) {
+			authService.setUser(response.data.data);
+		})
+
 		
+
+	}
+	authService.getCurrentUser = function() { return authService.currentUser; },
+	authService.getCurrentUserId = function() { return authService.refreshTokenInformation.userId; }
+	
 	authService.login = function (credentials) {
 		return $http({
 			url: 'https://hosted-dev.owntracks.org/api/v1/authenticate',
@@ -119,18 +182,35 @@ angular.module( 'sample', [
 			data: credentials,
 			skipAuthorization: true
 		}).then(function(response) {
-			login(response.data.data.refreshToken)
+			loginWithToken(response.data.data.refreshToken)
 		})
+	}
+	
+	authService.logoutReasonManual = function(){
+		// TODO: delete server side session 
+		authService.logout()
+		flash.success = 'You have logged out';
+	}
+	
+	authService.logoutReasonPasswordChange = function(){
+	
+		authService.logout()
+		flash.warn = 'Your session has expired due to updated credentials. Please login again.';
+
+	}
+	
+	authService.logoutReasonRefreshTokenExpired = function(){
+		authService.logout()
+		flash.error = 'Your session has expired. Please login again.';
+
 	}
 	
 	authService.logout = function () {
 		store.remove("accessToken");
 		store.remove("refreshToken");
-
 		authService.loggedIn = false; 
-	
-		console.log("loggedOut")
 		$rootScope.$broadcast('loggedOut');
+
 	}
 	
 
@@ -195,7 +275,7 @@ angular.module( 'sample', [
 					console.error("refresh token has expired or was revoked"); 
 				}
 				
-				authService.logout();
+				authService.logoutReasonRefreshTokenExpired();
 				return null;
 			});
 		} else {
@@ -204,7 +284,11 @@ angular.module( 'sample', [
 		}
 	}
 	
-  
+	// Login on page load if a refresh token exists
+	if(hasRefreshToken()) {
+		loginWithToken(getRefreshToken());			
+	} 
+		
 		
 	return authService;
 
@@ -229,11 +313,11 @@ angular.module( 'sample', [
 
     function fillUrl(urlFormat, pathParams, options) {
         var url = urlFormat;
-	console.log("fillUrl:" + urlFormat);
+		console.log("fillUrl:" + urlFormat);
 
-	var params = pathParams || {};
-	if(!options.skipAuthorization && !params.userId) {
-		params.userId = AuthenticationService.currentUser.userId;
+		var params = pathParams || {};
+		if(!options.skipAuthorization && !params.userId) {
+			params.userId = AuthenticationService.getCurrentUserId();
         }
 
         angular.forEach(params, function (val, name) {

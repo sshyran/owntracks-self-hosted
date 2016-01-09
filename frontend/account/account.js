@@ -10,7 +10,7 @@ angular.module( 'sample.account', [
 	bodyId: 'account'
   });
 })
-.controller( 'AccountCtrl', function LoginController( $scope, $interval, $window, $http, store, $state, AuthenticationService, API, ngDialog, Flash) {
+.controller( 'AccountCtrl', function LoginController($scope, $interval, $window, $http, store, $state, AuthenticationService, API, ngDialog, flash) {
 
 	API.get(API.endpoints.sessions, {params: {last: true}}).then(function(response) {
 		$scope.sessions = response.data
@@ -21,33 +21,56 @@ angular.module( 'sample.account', [
 	$scope.editAccount = function() {
 		$scope.formData = {};
 
-
 		
         var dialog = ngDialog.open({ template: 'account/edit.html', showClose: false, closeByEscape: true, closeByDocument: true, overlay: true, scope:  $scope});
 			
 		dialog.closePromise.then(function(data) {
-		    console.log(data.id + ' has been dismissed.');
-			console.log(data);
+
 		})
     };
-	
+
 	$scope.saveAccount = function() {
 		console.log($scope.formData); 
+		if(!$scope.formData.fullname) {
+			flash.to('flash-account-edit').error = 'Please your name';
+			return; 
+		}
 		
-		if($scope.formData.newPassword != $scope.formData.newPasswordRepeat) {
-			Flash.create('danger', 'new passwords do not match', 'custom-class');
+		if(!$scope.formData.password) {
+			flash.to('flash-account-edit').error = 'Please provide your current password';
+			return; 
+		}
+
+
+		if($scope.formData.newPassword && ($scope.formData.newPassword != $scope.formData.newPasswordRepeat)) {
+			flash.to('flash-account-edit').error = 'New passwords do not match';
 			return; 
 		}
 
 		API.POST(API.endpoints.user, {data: $scope.formData}).then(function(response) {
 			ngDialog.closeAll();
-			Flash.create('success', 'Account details updated successfully', 'custom-class');
+			flash.to('flash-account').success = 'Account details updated successfully';
+			AuthenticationService.setUser(response.data); 
 		}, function(error){
-			Flash.create('danger', 'Account details could not be updated', 'custom-class');
+
 			console.error(error);
-		})
-		
-		
+			if(error.status == 409) {
+				flash.to('flash-account-edit').error = 'The specified email address is already taken';
+				return; 
+			}
+			if(error.status == 401) {
+				flash.to('flash-account-edit').error = 'The provided current password is invalid';
+				return; 
+			}
+			if(error.status == 400) {
+				flash.to('flash-account-edit').error = 'Account details could not be updated due to an invalid request';
+				return; 
+			}
+			
+			
+			flash.to('flash-account-edit').error = 'Account details could not be updated';
+			
+		})	
 	}
 
 });

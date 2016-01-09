@@ -2,17 +2,6 @@
 	<div id="toolbar-primary" class="col-xs-12 col-md-6">
 		<h1> Devices </h1>
 	</div>
-	<div id="toolbar-actions" class="col-xs-12 col-md-6">
-		<div class="dropdown pull-right">
-			<button class="btn btn-default dropdown-toggle btn-actions "  type="button" id="dropdownMenu1" data-toggle="dropdown" >
-				Actions
-				<span class="caret"></span>
-			</button>
-			<ul class="dropdown-menu pull-right" aria-labelledby="dropdownMenu1">
-				<li><a ng-click="devicesAdd" >Add device</a></li>
-			</ul>
-		</div>
-	</div>
 </div>
 
 
@@ -29,6 +18,15 @@
 			</tr>
 		</thead>
 		<tbody>
+			<tr class="placeholder" ng-if="devices.length == 0">
+				<td>You don't have any devices yet</td>
+				<td></td>
+				<td></td>
+				<td></td>
+				<td></td>
+				<td></td>
+
+			</tr>
 			<tr ng-repeat="device in devices">
 
 				 <td class="devicename"> {{device.devicename}} </td>

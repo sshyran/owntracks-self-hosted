@@ -176,6 +176,7 @@ angular.module( 'sample.history', [
 	
 	queryHistory = function(fromTo) {
 		return API.get(API.endpoints.deviceHistory, {pathParams: {deviceId: $scope.device.id}, params: fromTo}).then(function(response) {
+			console.log(response);
 			$scope.records = (response.data && response.data.count > 0) ? response.data.locations : undefined
 
 			
@@ -216,6 +217,7 @@ angular.module( 'sample.history', [
 
 	var filterValidYears = function() {
 		var years = [];
+		
 		for(var i = min.getFullYear(); i<= max.getFullYear();++i){
 			years.push(i);
 		}
@@ -229,7 +231,7 @@ angular.module( 'sample.history', [
 		console.log("filter months");
 	
 		console.log(" >> maxYear " + maxYear);
-		console.log(" >> minYear " + maxYear);
+		console.log(" >> minYear " + minYear);
 		console.log(" >> minGetMonth " + min.getMonth());		
 		console.log(" >> maxGetmonth " + max.getMonth());
 
@@ -362,6 +364,7 @@ angular.module( 'sample.history', [
 		console.log(device);
 		$scope.device = device; 
 		min = new Date(device.createdAt); 
+		console.log("new min " + min);
 		picker.setMinDate(min);
 		
 		y = max.getFullYear(); 

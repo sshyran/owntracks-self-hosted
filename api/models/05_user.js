@@ -40,6 +40,7 @@ module.exports = function (sequelize, DataTypes) {
 						var pbkdf2 = util.format("PBKDF2$%s$%d$%s$%s", config.passwordOptions.algorithm, config.passwordOptions.rounds, saltB64, passwordHashB64)
 
 						this.setDataValue('password', pbkdf2);
+						
 				}
 			},
 		  passwordResetToken: {type: DataTypes.STRING, allowNull: true, default: null},
@@ -61,7 +62,18 @@ module.exports = function (sequelize, DataTypes) {
         },
         afterDestroy: function(instance, options, fn){
         		fn();
-        }
+        },
+	afterUpdate: function(instance, options, fn) {
+		if (instance.changed('password')) {
+			return app.db.models.Session.destroy({where: {userId: instance.id}}).then(function(){
+				fn(); 
+			}) 
+		} else {
+			fn(); 
+		}
+
+	}
+
 
       },
 			classMethods : {

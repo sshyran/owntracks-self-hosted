@@ -32,10 +32,10 @@ require('./backend/db.js')(app);
 require('./backend/broker.js')(app);
 require('./backend/mailer.js')(app);
 require('./backend/slack.js')(app);
-
 console.log = app.log;
 console.error = app.logError
 
+app.slack.sendAppStartedNotification(); 
 
 
 resError = function(res, message, status) {
@@ -577,7 +577,7 @@ app.get('/api/v1/users/:userId', requireAuth(), function (req, res, next) {
 
 app.post('/api/v1/users/:userId', requireAuth(), function (req, res, next) {
 	if(!req.params.userId || !(req.params.userId == req.jwt.userId || req.jwt.isAdmin) ) {
-		return resError(res, "user not found");
+		return resError(res, "user not found", 404);
 	}
 
         var fullname = req.body.fullname;
@@ -592,7 +592,7 @@ app.post('/api/v1/users/:userId', requireAuth(), function (req, res, next) {
 	return app.db.models.User.findById(req.params.userId).then(function(user) {
 		var attributes = {};
  	       	if (validator.isNull(password) || validator.isWhitespace(password) || !user.authenticate(password)) {
-     			return resError(res, "the provided current password is invalid", 400);
+     			return resError(res, "the provided current password is invalid", 401);
        		}
 
         	if(!validator.isNull(newPassword) && !validator.isWhitespace(newPassword)) {

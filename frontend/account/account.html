@@ -4,7 +4,7 @@
 	</div>
 	<div id="toolbar-actions" class="col-xs-12 col-md-6">
 		<div class="dropdown pull-right">
-			<button class="btn btn-default dropdown-toggle btn-actions "  type="button" id="dropdownMenu1" data-toggle="dropdown" >
+			<button class="btn btn-default dropdown-toggle btn-actions" type="button" id="dropdownMenu1" data-toggle="dropdown" >
 				Actions
 				<span class="caret"></span>
 			</button>
@@ -17,6 +17,10 @@
 
 
 <div id="body">
+	<div id="flash-account" flash-alert active-class="in alert" class="fade">
+		<span class="alert-message">{{flash.message}}</span>
+	</div>
+
 	<div class="row">
 		<div class="col-md-6 col-xs-12">
 			<div class="panel-header panel-header-outside">
@@ -27,13 +31,13 @@
 				<div class="panel-body">
 					<dl class="dl-horizontal">
 					  <dt>Username</dt>
-					  <dd>{{user.username}}</dd>
+					  <dd>{{AuthenticationService.currentUser.username}}</dd>
 					  <dt>ID</dt>
-					  <dd>{{user.id}}</dd>
+					  <dd>{{AuthenticationService.currentUser.id}}</dd>
 					  <dt>Fullname</dt>
-					  <dd>{{user.fullname}}</dd>
+					  <dd>{{AuthenticationService.currentUser.fullname}}</dd>
 					  <dt>Email</dt>
-					  <dd>{{user.email}}</dd>
+					  <dd>{{AuthenticationService.currentUser.email}}</dd>
 
 					</dl>
 				</div>			

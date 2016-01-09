@@ -16,8 +16,8 @@ angular.module( 'sample.shares', [
 })
 .controller( 'SharesCtrl', function DevicesController( $scope, API, ngDialog) {
 	var controller = this; 
-	API.GET(API.endpoints.shares).then(function(data) {
-		$scope.shares = data.data
+	API.GET(API.endpoints.shares).then(function(response) {
+		$scope.shares = response.data
     }, function(error) {
 		console.log(error);
     });
@@ -33,7 +33,7 @@ angular.module( 'sample.shares', [
 
 		
 	$scope.deleteShare = function(share) {
-		API.DELETE(API.endpoints.share, {pathParams: {shareId: share.id}}).then(function(data) {		
+		API.DELETE(API.endpoints.share, {pathParams: {shareId: share.id}}).then(function(response) {		
 			var index = $scope.share.indexOf(share);
 			$scope.shareS.splice(index, 1);     
 		}, function(error) {
@@ -46,26 +46,22 @@ angular.module( 'sample.shares', [
 		$scope.formData = {};
 
         var dialog = ngDialog.open({ template: 'shares/add.html', showClose: false, closeByEscape: true, closeByDocument: true, overlay: true, scope:  $scope});
-		API.GET(API.endpoints.devices).then(function(data) {
-			$scope.devices = data;
+		API.GET(API.endpoints.devices).then(function(response) {
+			$scope.devices = response.data;
 		}, function(error) {
 			console.log(error);
 		});
 		
 
-		dialog.closePromise.then(function(data) {
-		    console.log(data.id + ' has been dismissed.');
-			console.log(data);
+		dialog.closePromise.then(function(response) {
 		})
     };
 	
 	$scope.saveTracker = function() {
 		console.log($scope.formData); 
 		
-		API.POST(API.endpoints.trackers, {data: $scope.formData}).then(function(tracker) {
-			console.log("tracker created");
-			console.log(tracker);
-			$scope.trackers.push(tracker)
+		API.POST(API.endpoints.trackers, {data: $scope.formData}).then(function(response) {
+			$scope.trackers.push(response.data)
 		}, function(error){
 			console.error(error);
 		})
